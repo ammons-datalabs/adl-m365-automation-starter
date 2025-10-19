@@ -1,0 +1,50 @@
+{
+  "type": "AdaptiveCard",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "version": "1.4",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "Invoice Approval",
+      "weight": "Bolder",
+      "size": "Medium"
+    },
+    {
+      "type": "FactSet",
+      "facts": [
+        {
+          "title": "vendor",
+          "value": "{{vendor}}"
+        },
+        {
+          "title": "invoice_number",
+          "value": "{{invoice_number}}"
+        },
+        {
+          "title": "total",
+          "value": "{{total}}"
+        },
+        {
+          "title": "confidence",
+          "value": "{{confidence}}"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Submit",
+      "title": "Approve",
+      "data": {
+        "action": "approve"
+      }
+    },
+    {
+      "type": "Action.Submit",
+      "title": "Reject",
+      "data": {
+        "action": "reject"
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "type": "http",
+  "method": "POST",
+  "uri": "https://YOUR-APP/invoices/extract",
+  "headers": {
+    "Content-Type": "multipart/form-data"
+  },
+  "body": "form-data: file=<SharePoint file content>"
+}
