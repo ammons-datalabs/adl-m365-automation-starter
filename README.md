@@ -1,6 +1,8 @@
 
 # ADL M365 Automation Starter
 
+![CI & Deploy](https://github.com/ammons-datalabs/adl-m365-automation-starter/actions/workflows/ci-deploy.yml/badge.svg)
+
 Production‑ready starter for **Microsoft 365 intelligent automation** using **FastAPI** + **Power Automate** with CI via **Azure DevOps**.
 
 **Why this repo**
