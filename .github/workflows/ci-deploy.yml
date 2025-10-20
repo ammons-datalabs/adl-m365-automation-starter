@@ -37,6 +37,9 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Give Kudu a moment to settle
+        run: sleep 20
+
       - name: Deploy to Web App
         uses: azure/webapps-deploy@v3
         with:
