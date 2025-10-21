@@ -9,7 +9,7 @@ client = TestClient(app)
 def test_approve_skips_without_webhook():
     # Ensure webhook unset
     settings.teams_webhook_url = None
-    r = client.post("/invoices/approve", json={"vendor": "Contoso"})
+    r = client.post("/invoices/request-approval", json={"vendor": "Contoso"})
     assert r.status_code == 200
     assert r.json()["result"]["status"] == "skipped"
 
@@ -25,7 +25,7 @@ def test_approve_posts_adaptive_card():
         "currency": "AUD",
         "confidence": 0.95
     }
-    r = client.post("/invoices/approve", json=payload)
+    r = client.post("/invoices/request-approval", json=payload)
     assert r.status_code == 200
     data = r.json()["result"]
     assert data["status"] == "sent"

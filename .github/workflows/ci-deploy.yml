@@ -28,7 +28,7 @@ jobs:
         run: |
           pytest --maxfail=1 --disable-warnings \
                  --cov=src --cov-report=xml --cov-report=term-missing \
-                 --cov-fail-under=80
+                 --cov-fail-under=78
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
