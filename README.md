@@ -30,8 +30,11 @@ uvicorn src.api.main:app --reload
 
 ### Minimal API surface
 - `GET /health` – readiness probe.
-- `POST /invoices/extract` – multipart/form‑data with file; returns extracted fields (stub or Azure DI).
-- `POST /invoices/approve` – demo approval: posts an Adaptive Card to a Teams Incoming Webhook (or stub).
+- `POST /invoices/extract` – multipart/form‑data with file; returns extracted fields using Azure Document Intelligence.
+- `POST /invoices/request-approval` – creates approval request and posts Adaptive Card to Teams with approval links.
+- `GET /invoices/approval/{id}/approve` – approve invoice (opens HTML confirmation page).
+- `GET /invoices/approval/{id}/reject` – reject invoice (opens HTML confirmation page).
+- `GET /invoices/approvals` – list all approval requests.
 
 ### Power Automate (sample flow)
 1. **Trigger**: “When a file is created (properties only)” (SharePoint).
