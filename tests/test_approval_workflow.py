@@ -142,3 +142,42 @@ def test_approval_tracker_methods():
     approval = approval_tracker.get_approval(approval_id)
     assert approval["status"] == "approved"
     assert approval["decided_by"] == "testuser"
+
+
+def test_list_approved_invoices():
+    """Test listing approved invoices with filtering"""
+    approval_tracker._approvals.clear()
+
+    # Create mix of approved, rejected, and pending
+    id1 = approval_tracker.create_approval({"vendor": "Auto Corp", "confidence": 0.95})
+    approval_tracker.approve(id1, "system-auto")
+
+    id2 = approval_tracker.create_approval({"vendor": "Manual Corp", "confidence": 0.75})
+    approval_tracker.approve(id2, "user")
+
+    id3 = approval_tracker.create_approval({"vendor": "Rejected Corp", "confidence": 0.60})
+    approval_tracker.reject(id3, "user")
+
+    id4 = approval_tracker.create_approval({"vendor": "Pending Corp", "confidence": 0.80})
+
+    # Test the endpoint
+    r = client.get("/invoices/approvals/approved")
+    assert r.status_code == 200
+    data = r.json()
+
+    # Should only show approved (not rejected or pending)
+    assert data["total_approved"] == 2
+
+    # Check details
+    invoices = data["invoices"]
+    assert len(invoices) == 2
+
+    # Find the auto-approved one
+    auto = next(inv for inv in invoices if inv["vendor"] == "Auto Corp")
+    assert auto["approval_type"] == "AI Auto-Approved"
+    assert auto["approved_by"] == "system-auto"
+
+    # Find the human-approved one
+    manual = next(inv for inv in invoices if inv["vendor"] == "Manual Corp")
+    assert manual["approval_type"] == "Human Approved"
+    assert manual["approved_by"] == "user"
