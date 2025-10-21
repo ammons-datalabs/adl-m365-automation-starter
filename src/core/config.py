@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Teams
     teams_webhook_url: str | None = Field(default=None, alias="TEAMS_WEBHOOK_URL")
 
+    # API Base URL (for approval links in Teams cards)
+    api_base_url: str = Field("http://127.0.0.1:8000", alias="API_BASE_URL")
+
     # Observability
     appinsights_connection_string: str | None = Field(default=None, alias="APPINSIGHTS_CONNECTION_STRING")
 

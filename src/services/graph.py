@@ -19,22 +19,39 @@ ADAPTIVE_CARD_TEMPLATE = {
                 {"type": "FactSet", "facts": []}
             ],
             "actions": [
-                {"type": "Action.Submit", "title": "Approve", "data": {"action": "approve"}},
-                {"type": "Action.Submit", "title": "Reject", "data": {"action": "reject"}}
+                {"type": "Action.OpenUrl", "title": "Approve", "url": "https://example.com/approve"},
+                {"type": "Action.OpenUrl", "title": "Reject", "url": "https://example.com/reject"}
             ]
         }
     }]
 }
 
-async def post_approval_card(fields: dict) -> dict:
+async def post_approval_card(fields: dict, approval_id: str) -> dict:
     if not settings.teams_webhook_url:
         return {"status": "skipped", "reason": "TEAMS_WEBHOOK_URL not set"}
+
+    # Use configured API base URL (supports both local and deployed environments)
+    base_url = settings.api_base_url
 
     card = json.loads(json.dumps(ADAPTIVE_CARD_TEMPLATE))
     facts = card["attachments"][0]["content"]["body"][1]["facts"]
     for k in ["vendor","invoice_number","invoice_date","total","currency","confidence"]:
         if k in fields and fields[k] is not None:
             facts.append({"title": k, "value": str(fields[k])})
+
+    # Update the action buttons with actual approval URLs
+    card["attachments"][0]["content"]["actions"] = [
+        {
+            "type": "Action.OpenUrl",
+            "title": "Approve",
+            "url": f"{base_url}/invoices/approval/{approval_id}/approve"
+        },
+        {
+            "type": "Action.OpenUrl",
+            "title": "Reject",
+            "url": f"{base_url}/invoices/approval/{approval_id}/reject"
+        }
+    ]
 
     async with httpx.AsyncClient(timeout=10) as client:
         r = await client.post(settings.teams_webhook_url, json=card)
