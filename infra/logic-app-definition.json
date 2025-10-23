@@ -1,0 +1,307 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "When_a_file_is_created_(properties_only)": {
+                "recurrence": {
+                    "interval": 1,
+                    "frequency": "Minute",
+                    "timeZone": "Pacific Standard Time"
+                },
+                "evaluatedRecurrence": {
+                    "interval": 1,
+                    "frequency": "Minute",
+                    "timeZone": "Pacific Standard Time"
+                },
+                "splitOn": "@triggerBody()?['value']",
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://metachunklabs.sharepoint.com/sites/ADLInvoiceDemo'))}/tables/@{encodeURIComponent(encodeURIComponent('64e6e863-ae18-414d-bd68-179e7c40c032'))}/onnewfileitems",
+                    "queries": {
+                        "folderPath": "/Invoices/Incoming"
+                    }
+                },
+                "description": "New Invoice"
+            }
+        },
+        "actions": {
+            "Get_file_content": {
+                "runAfter": {},
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://metachunklabs.sharepoint.com/sites/ADLInvoiceDemo'))}/files/@{encodeURIComponent(triggerBody()?['{Identifier}'])}/content",
+                    "queries": {
+                        "inferContentType": true
+                    }
+                }
+            },
+            "HTTP": {
+                "runAfter": {
+                    "Get_file_content": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http",
+                "inputs": {
+                    "uri": "https://adl-invoice-extraction.cognitiveservices.azure.com/formrecognizer/documentModels/prebuilt-invoice:analyze?api-version=2023-07-31",
+                    "method": "POST",
+                    "headers": {
+                        "Ocp-Apim-Subscription-Key": "<YOUR-DOCUMENT-INTELLIGENCE-KEY>",
+                        "Content-Type": "application/pdf"
+                    },
+                    "body": "@base64ToBinary(body('Get_file_content')?['$content'])"
+                },
+                "runtimeConfiguration": {
+                    "contentTransfer": {
+                        "transferMode": "Chunked"
+                    }
+                }
+            },
+            "Compose": {
+                "runAfter": {
+                    "HTTP_3": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Compose",
+                "inputs": "@body('HTTP_3')"
+            },
+            "Condition": {
+                "actions": {
+                    "HTTP_1": {
+                        "runAfter": {
+                            "Move_file": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "https://metachunklabs.webhook.office.com/webhookb2/2c2e166e-a234-4fed-b97b-83b1c791517f@bd89baf7-f8c6-4cf2-834f-58befb004d2b/IncomingWebhook/96b31697c2ba41abbd8ddffa56b357e2/9ad16f75-6cb6-479f-b090-05b3b1e968f5/V2p1ELXUOTW9gFn-9drBKpXK_YJenX0hzWe_90yrlajtQ1",
+                            "method": "POST",
+                            "headers": {
+                                "Content-Type": "application/json"
+                            },
+                            "body": {
+                                "text": "Auto-approved: @{triggerBody()?['Name']} | Total: $@{coalesce(outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['InvoiceTotal']?['valueCurrency']?['amount'], 'n/a')}"
+                            }
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    },
+                    "Update_file_properties": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                                }
+                            },
+                            "method": "patch",
+                            "body": {
+                                "Vendor": "@triggerBody()?['Vendor']",
+                                "Status": {
+                                    "Value": "Approved"
+                                }
+                            },
+                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://metachunklabs.sharepoint.com/sites/ADLInvoiceDemo'))}/tables/@{encodeURIComponent(encodeURIComponent('64e6e863-ae18-414d-bd68-179e7c40c032'))}/items/@{encodeURIComponent(triggerBody()?['ID'])}/patchfileitem"
+                        }
+                    },
+                    "Move_file": {
+                        "runAfter": {
+                            "Update_file_properties": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "sourceFileId": "@body('Update_file_properties')?['{Identifier}']",
+                                "destinationDataset": "https://metachunklabs.sharepoint.com/sites/ADLInvoiceDemo",
+                                "destinationFolderPath": "/Invoices/Approved",
+                                "nameConflictBehavior": 1
+                            },
+                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://metachunklabs.sharepoint.com/sites/ADLInvoiceDemo'))}/moveFileAsync"
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Compose": [
+                        "Succeeded"
+                    ]
+                },
+                "else": {
+                    "actions": {
+                        "HTTP_2": {
+                            "runAfter": {
+                                "Move_file_1": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "https://metachunklabs.webhook.office.com/webhookb2/2c2e166e-a234-4fed-b97b-83b1c791517f@bd89baf7-f8c6-4cf2-834f-58befb004d2b/IncomingWebhook/96b31697c2ba41abbd8ddffa56b357e2/9ad16f75-6cb6-479f-b090-05b3b1e968f5/V2p1ELXUOTW9gFn-9drBKpXK_YJenX0hzWe_90yrlajtQ1",
+                                "method": "POST",
+                                "headers": {
+                                    "Content-Type": "application/json"
+                                },
+                                "body": {
+                                    "text": "Pending approval: @{triggerBody()?['Name']} | Total: $@{coalesce(outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['InvoiceTotal']?['valueCurrency']?['amount'], 'n/a')}"
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "Update_file_properties_1": {
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                                    }
+                                },
+                                "method": "patch",
+                                "body": {
+                                    "Vendor": "@triggerBody()?['Vendor']",
+                                    "Status": {
+                                        "Value": "Pending"
+                                    }
+                                },
+                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://metachunklabs.sharepoint.com/sites/ADLInvoiceDemo'))}/tables/@{encodeURIComponent(encodeURIComponent('64e6e863-ae18-414d-bd68-179e7c40c032'))}/items/@{encodeURIComponent(triggerBody()?['ID'])}/patchfileitem"
+                            }
+                        },
+                        "Move_file_1": {
+                            "runAfter": {
+                                "Update_file_properties_1": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "body": {
+                                    "sourceFileId": "@body('Update_file_properties_1')?['{Identifier}']",
+                                    "destinationDataset": "https://metachunklabs.sharepoint.com/sites/ADLInvoiceDemo",
+                                    "destinationFolderPath": "/Invoices/Pending",
+                                    "nameConflictBehavior": 1
+                                },
+                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://metachunklabs.sharepoint.com/sites/ADLInvoiceDemo'))}/moveFileAsync"
+                            }
+                        }
+                    }
+                },
+                "expression": {
+                    "and": [
+                        {
+                            "lessOrEquals": [
+                                "@float(coalesce(outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['InvoiceTotal']?['valueCurrency']?['amount'], 0))",
+                                500
+                            ]
+                        },
+                        {
+                            "greater": [
+                                "@float(coalesce(outputs('Compose')?['analyzeResult']?['documents']?[0]?['confidence'], 0))",
+                                0.85
+                            ]
+                        },
+                        {
+                            "equals": [
+                                "@contains(toLower(string(coalesce(outputs('Compose')?['analyzeResult']?['content'], ''))), 'invoice')",
+                                true
+                            ]
+                        },
+                        {
+                            "equals": [
+                                "@not(contains(toLower(string(coalesce(outputs('Compose')?['analyzeResult']?['content'], ''))), 'receipt'))",
+                                true
+                            ]
+                        }
+                    ]
+                },
+                "type": "If"
+            },
+            "HTTP_3": {
+                "runAfter": {
+                    "Delay": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http",
+                "inputs": {
+                    "uri": "@outputs('HTTP')['headers']['Operation-Location']",
+                    "method": "GET",
+                    "headers": {
+                        "Ocp-Apim-Subscription-Key": "<YOUR-DOCUMENT-INTELLIGENCE-KEY>"
+                    }
+                },
+                "runtimeConfiguration": {
+                    "contentTransfer": {
+                        "transferMode": "Chunked"
+                    }
+                }
+            },
+            "Delay": {
+                "runAfter": {
+                    "HTTP": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Wait",
+                "inputs": {
+                    "interval": {
+                        "count": 5,
+                        "unit": "Second"
+                    }
+                }
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "sharepointonline": {
+                    "id": "/subscriptions/7c37abd2-ca30-416b-bf2c-3e203b7dd529/providers/Microsoft.Web/locations/westus2/managedApis/sharepointonline",
+                    "connectionId": "/subscriptions/7c37abd2-ca30-416b-bf2c-3e203b7dd529/resourceGroups/rg-adl-m365/providers/Microsoft.Web/connections/sharepoint",
+                    "connectionName": "sharepoint"
+                }
+            }
+        }
+    }
+}
