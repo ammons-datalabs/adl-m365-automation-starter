@@ -7,7 +7,7 @@
 > **Hands-on AI + Automation across Microsoft 365**  
 > Demonstrates how to design, deploy, and document an **intelligent invoice-routing system** using **Azure Logic Apps**, **Azure Document Intelligence**, and **Teams** — complete with CI/CD, 80 %+ test coverage, and citizen-developer enablement.  
 
- **[Watch the 90-second demo →](https://youtu.be/a_5d8T2u-dQ)**  
+ **[Watch the 2.5 minute demo →](https://youtu.be/a_5d8T2u-dQ)**  
 
 ---
 
