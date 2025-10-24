@@ -5,7 +5,8 @@ import io
 
 client = TestClient(app)
 
-def test_extract_success_pdf_bytes():
+def test_extract_success_multipart():
+    """Test /extract with multipart/form-data (file upload)"""
     # Disable Azure DI for tests - use mock fallback
     original_endpoint = settings.az_di_endpoint
     original_key = settings.az_di_api_key
@@ -16,6 +17,56 @@ def test_extract_success_pdf_bytes():
         pdf_bytes = b"%PDF-1.4 minimal"
         files = {"file": ("sample.pdf", io.BytesIO(pdf_bytes), "application/pdf")}
         r = client.post("/invoices/extract", files=files)
+        assert r.status_code == 200
+        body = r.json()
+        # Contract: keys present
+        for k in ["vendor","invoice_number","invoice_date","total","currency","confidence"]:
+            assert k in body
+        assert body["confidence"] >= 0.9
+    finally:
+        settings.az_di_endpoint = original_endpoint
+        settings.az_di_api_key = original_key
+
+def test_extract_success_raw_binary():
+    """Test /extract with raw binary body (Logic Apps/Power Automate style)"""
+    # Disable Azure DI for tests - use mock fallback
+    original_endpoint = settings.az_di_endpoint
+    original_key = settings.az_di_api_key
+    settings.az_di_endpoint = None
+    settings.az_di_api_key = None
+
+    try:
+        pdf_bytes = b"%PDF-1.4 minimal invoice content"
+        r = client.post(
+            "/invoices/extract",
+            content=pdf_bytes,
+            headers={"Content-Type": "application/pdf"}
+        )
+        assert r.status_code == 200
+        body = r.json()
+        # Contract: keys present
+        for k in ["vendor","invoice_number","invoice_date","total","currency","confidence"]:
+            assert k in body
+        assert body["confidence"] >= 0.9
+    finally:
+        settings.az_di_endpoint = original_endpoint
+        settings.az_di_api_key = original_key
+
+def test_extract_success_raw_octet_stream():
+    """Test /extract with application/octet-stream content type"""
+    # Disable Azure DI for tests - use mock fallback
+    original_endpoint = settings.az_di_endpoint
+    original_key = settings.az_di_api_key
+    settings.az_di_endpoint = None
+    settings.az_di_api_key = None
+
+    try:
+        pdf_bytes = b"%PDF-1.4 octet stream invoice"
+        r = client.post(
+            "/invoices/extract",
+            content=pdf_bytes,
+            headers={"Content-Type": "application/octet-stream"}
+        )
         assert r.status_code == 200
         body = r.json()
         # Contract: keys present

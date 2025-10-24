@@ -61,8 +61,15 @@ def extract_invoice_fields(file_bytes: bytes) -> ExtractedInvoice:
                 total_amount = 0.0
                 if invoice_total_raw:
                     try:
-                        # Handle currency symbols and commas
-                        total_str = str(invoice_total_raw).replace("$", "").replace(",", "").strip()
+                        # Handle currency symbols, currency codes, and commas
+                        # Examples: "$123.45", "USD 123.45", "123.45", "1,234.56"
+                        total_str = str(invoice_total_raw)
+                        # Remove currency symbols and codes
+                        total_str = total_str.replace("$", "").replace(",", "")
+                        # Remove common currency codes (USD, AUD, EUR, GBP, etc.)
+                        for curr_code in ["USD", "AUD", "EUR", "GBP", "CAD", "JPY", "CNY"]:
+                            total_str = total_str.replace(curr_code, "")
+                        total_str = total_str.strip()
                         total_amount = float(total_str)
                     except (ValueError, TypeError):
                         logger.warning(f"Could not parse invoice total: {invoice_total_raw}")

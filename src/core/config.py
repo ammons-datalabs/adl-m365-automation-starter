@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     # Observability
     appinsights_connection_string: str | None = Field(default=None, alias="APPINSIGHTS_CONNECTION_STRING")
 
+    # Approval Rules Configuration
+    approval_amount_threshold: float = Field(500.0, alias="APPROVAL_AMOUNT_THRESHOLD")
+    approval_min_confidence: float = Field(0.85, alias="APPROVAL_MIN_CONFIDENCE")
+    approval_require_invoice_keyword: bool = Field(True, alias="APPROVAL_REQUIRE_INVOICE_KEYWORD")
+    approval_reject_receipt_keyword: bool = Field(True, alias="APPROVAL_REJECT_RECEIPT_KEYWORD")
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 settings = Settings()

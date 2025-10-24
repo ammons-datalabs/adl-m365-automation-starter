@@ -1,18 +1,56 @@
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 from ..deps import ExtractResponse
 from ...services.form_recognizer import extract_invoice_fields
 from ...services.graph import post_approval_card
 from ...services.storage import approval_tracker
+from ...services.approval_rules import create_approval_rules
 from ...models.invoice import ApprovalRequest
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
+
+class ValidateRequest(BaseModel):
+    """Request body for /invoices/validate endpoint"""
+    amount: float
+    confidence: float
+    content: str
+    vendor: str = None
+
+
+class ValidateResponse(BaseModel):
+    """Response from /invoices/validate endpoint"""
+    approved: bool
+    reason: str
+    checks: dict
+    metadata: dict
+
 @router.post("/extract", response_model=ExtractResponse)
-async def extract(file: UploadFile = File(...)):
+async def extract(request: Request, file: UploadFile = File(None)):
+    """
+    Extract invoice fields using Azure Document Intelligence.
+
+    Accepts either:
+    - multipart/form-data (file upload via form)
+    - application/pdf or application/octet-stream (raw binary body)
+
+    This dual-input format allows the endpoint to be called from:
+    - Web forms (multipart)
+    - Logic Apps/Power Automate (raw binary)
+    - API clients like curl/Postman
+    """
     try:
-        content = await file.read()
+        if file:
+            # Multipart form-data upload
+            content = await file.read()
+        else:
+            # Raw binary body (e.g., from Logic Apps)
+            content = await request.body()
+            if not content:
+                raise HTTPException(status_code=422, detail="No file provided (either multipart or raw body)")
+
         extracted = extract_invoice_fields(content)
         return ExtractResponse(
             vendor=extracted.vendor,
@@ -22,8 +60,66 @@ async def extract(file: UploadFile = File(...)):
             currency=extracted.currency,
             confidence=extracted.confidence,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/validate", response_model=ValidateResponse)
+async def validate_for_approval(req: ValidateRequest):
+    """
+    Validate invoice data against approval rules.
+
+    This endpoint centralizes business logic for approval decisions,
+    making it reusable from Logic Apps, Power Automate, or other clients.
+
+    Benefits over embedding rules in Logic Apps:
+    - Single source of truth for approval logic
+    - Easy to test and modify
+    - Supports complex rules (vendor whitelists, duplicate detection, etc.)
+    - Configuration via environment variables
+    - Detailed check results for debugging
+
+    Example request:
+    {
+        "amount": 450.00,
+        "confidence": 0.92,
+        "content": "INVOICE\\nVendor: ACME Corp\\nTotal: $450.00",
+        "vendor": "ACME Corp"
+    }
+
+    Example response:
+    {
+        "approved": true,
+        "reason": "Auto-approved: $450.00, 92.0% confidence",
+        "checks": {
+            "amount_within_limit": true,
+            "confidence_sufficient": true,
+            "contains_invoice_keyword": true,
+            "does_not_contain_receipt_keyword": true
+        },
+        "metadata": {...}
+    }
+    """
+    try:
+        rules = create_approval_rules()
+        decision = rules.evaluate(
+            amount=req.amount,
+            confidence=req.confidence,
+            content=req.content,
+            vendor=req.vendor
+        )
+
+        return ValidateResponse(
+            approved=decision.approved,
+            reason=decision.reason,
+            checks=decision.checks,
+            metadata=decision.metadata
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.post("/process")
 async def process_invoice(file: UploadFile = File(...), confidence_threshold: float = 0.85):
