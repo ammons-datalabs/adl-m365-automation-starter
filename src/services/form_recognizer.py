@@ -3,7 +3,7 @@ from io import BytesIO
 from loguru import logger
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
-from .types import ExtractedInvoice
+from .invoice_types import ExtractedInvoice
 from ..core.config import settings
 
 
