@@ -1,0 +1,390 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "When_a_file_is_created_(properties_only)": {
+                "recurrence": {
+                    "interval": 1,
+                    "frequency": "Minute",
+                    "timeZone": "Pacific Standard Time"
+                },
+                "evaluatedRecurrence": {
+                    "interval": 1,
+                    "frequency": "Minute",
+                    "timeZone": "Pacific Standard Time"
+                },
+                "splitOn": "@triggerBody()?['value']",
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent('YOUR_SHAREPOINT_SITE_URL'))}/tables/@{encodeURIComponent(encodeURIComponent('YOUR_LIBRARY_ID'))}/onnewfileitems",
+                    "queries": {
+                        "folderPath": "/Invoices/Incoming"
+                    }
+                },
+                "description": "New Invoice detected in SharePoint",
+                "runtimeConfiguration": {
+                    "concurrency": {
+                        "runs": 1
+                    }
+                }
+            }
+        },
+        "actions": {
+            "Get_file_content": {
+                "runAfter": {},
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent('YOUR_SHAREPOINT_SITE_URL'))}/files/@{encodeURIComponent(triggerBody()?['{Identifier}'])}/content",
+                    "queries": {
+                        "inferContentType": true
+                    }
+                },
+                "description": "Download PDF from SharePoint"
+            },
+            "Extract_invoice_data": {
+                "runAfter": {
+                    "Get_file_content": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http",
+                "inputs": {
+                    "uri": "@{parameters('FASTAPI_BASE_URL')}/invoices/extract",
+                    "method": "POST",
+                    "headers": {
+                        "Content-Type": "application/pdf"
+                    },
+                    "body": "@base64ToBinary(body('Get_file_content')?['$content'])"
+                },
+                "description": "Call FastAPI /invoices/extract endpoint"
+            },
+            "Validate_for_approval": {
+                "runAfter": {
+                    "Extract_invoice_data": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http",
+                "inputs": {
+                    "uri": "@{parameters('FASTAPI_BASE_URL')}/invoices/validate",
+                    "method": "POST",
+                    "headers": {
+                        "Content-Type": "application/json"
+                    },
+                    "body": {
+                        "amount": "@body('Extract_invoice_data')?['total']",
+                        "confidence": "@body('Extract_invoice_data')?['confidence']",
+                        "content": "@body('Extract_invoice_data')?['content']",
+                        "vendor": "@body('Extract_invoice_data')?['vendor']",
+                        "bill_to": "@body('Extract_invoice_data')?['bill_to']"
+                    }
+                },
+                "description": "Call FastAPI /invoices/validate endpoint with intelligent classification"
+            },
+            "Approval_decision": {
+                "actions": {
+                    "Update_file_properties_approved": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                                }
+                            },
+                            "method": "patch",
+                            "body": {
+                                "Vendor": "@body('Extract_invoice_data')?['vendor']",
+                                "InvoiceTotal": "@body('Extract_invoice_data')?['total']",
+                                "Status": {
+                                    "Value": "Approved"
+                                }
+                            },
+                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent('YOUR_SHAREPOINT_SITE_URL'))}/tables/@{encodeURIComponent(encodeURIComponent('YOUR_LIBRARY_ID'))}/items/@{encodeURIComponent(triggerBody()?['ID'])}/patchfileitem"
+                        },
+                        "description": "Update SharePoint metadata for approved invoice"
+                    },
+                    "Move_file_approved": {
+                        "runAfter": {
+                            "Update_file_properties_approved": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "sourceFileId": "@body('Update_file_properties_approved')?['{Identifier}']",
+                                "destinationDataset": "YOUR_SHAREPOINT_SITE_URL",
+                                "destinationFolderPath": "/Invoices/Approved",
+                                "nameConflictBehavior": 1
+                            },
+                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent('YOUR_SHAREPOINT_SITE_URL'))}/moveFileAsync"
+                        },
+                        "description": "Move to Approved folder"
+                    },
+                    "Notify_Teams_approved": {
+                        "runAfter": {
+                            "Move_file_approved": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "@parameters('TEAMS_WEBHOOK_URL')",
+                            "method": "POST",
+                            "headers": {
+                                "Content-Type": "application/json"
+                            },
+                            "body": {
+                                "type": "message",
+                                "attachments": [
+                                    {
+                                        "contentType": "application/vnd.microsoft.card.adaptive",
+                                        "content": {
+                                            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                                            "type": "AdaptiveCard",
+                                            "version": "1.4",
+                                            "body": [
+                                                {
+                                                    "type": "TextBlock",
+                                                    "text": "✅ Invoice Auto-Approved",
+                                                    "weight": "Bolder",
+                                                    "size": "Large",
+                                                    "color": "Good"
+                                                },
+                                                {
+                                                    "type": "FactSet",
+                                                    "facts": [
+                                                        {
+                                                            "title": "Filename:",
+                                                            "value": "@{triggerBody()?['Name']}"
+                                                        },
+                                                        {
+                                                            "title": "Vendor:",
+                                                            "value": "@{body('Extract_invoice_data')?['vendor']}"
+                                                        },
+                                                        {
+                                                            "title": "Invoice #:",
+                                                            "value": "@{body('Extract_invoice_data')?['invoice_number']}"
+                                                        },
+                                                        {
+                                                            "title": "Total:",
+                                                            "value": "@{body('Extract_invoice_data')?['currency']} @{body('Extract_invoice_data')?['total']}"
+                                                        },
+                                                        {
+                                                            "title": "Confidence:",
+                                                            "value": "@{formatNumber(mul(body('Extract_invoice_data')?['confidence'], 100), '0.0')}%"
+                                                        },
+                                                        {
+                                                            "title": "Reason:",
+                                                            "value": "@{body('Validate_for_approval')?['reason']}"
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        "description": "Send Adaptive Card to Teams for approved invoice"
+                    }
+                },
+                "runAfter": {
+                    "Validate_for_approval": [
+                        "Succeeded"
+                    ]
+                },
+                "else": {
+                    "actions": {
+                        "Update_file_properties_pending": {
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                                    }
+                                },
+                                "method": "patch",
+                                "body": {
+                                    "Vendor": "@body('Extract_invoice_data')?['vendor']",
+                                    "InvoiceTotal": "@body('Extract_invoice_data')?['total']",
+                                    "Status": {
+                                        "Value": "Pending"
+                                    }
+                                },
+                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent('YOUR_SHAREPOINT_SITE_URL'))}/tables/@{encodeURIComponent(encodeURIComponent('YOUR_LIBRARY_ID'))}/items/@{encodeURIComponent(triggerBody()?['ID'])}/patchfileitem"
+                            },
+                            "description": "Update SharePoint metadata for pending invoice"
+                        },
+                        "Move_file_pending": {
+                            "runAfter": {
+                                "Update_file_properties_pending": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "body": {
+                                    "sourceFileId": "@body('Update_file_properties_pending')?['{Identifier}']",
+                                    "destinationDataset": "YOUR_SHAREPOINT_SITE_URL",
+                                    "destinationFolderPath": "/Invoices/Pending",
+                                    "nameConflictBehavior": 1
+                                },
+                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent('YOUR_SHAREPOINT_SITE_URL'))}/moveFileAsync"
+                            },
+                            "description": "Move to Pending folder"
+                        },
+                        "Notify_Teams_pending": {
+                            "runAfter": {
+                                "Move_file_pending": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "@parameters('TEAMS_WEBHOOK_URL')",
+                                "method": "POST",
+                                "headers": {
+                                    "Content-Type": "application/json"
+                                },
+                                "body": {
+                                    "type": "message",
+                                    "attachments": [
+                                        {
+                                            "contentType": "application/vnd.microsoft.card.adaptive",
+                                            "content": {
+                                                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                                                "type": "AdaptiveCard",
+                                                "version": "1.4",
+                                                "body": [
+                                                    {
+                                                        "type": "TextBlock",
+                                                        "text": "⚠️ Invoice Requires Review",
+                                                        "weight": "Bolder",
+                                                        "size": "Large",
+                                                        "color": "Warning"
+                                                    },
+                                                    {
+                                                        "type": "FactSet",
+                                                        "facts": [
+                                                            {
+                                                                "title": "Filename:",
+                                                                "value": "@{triggerBody()?['Name']}"
+                                                            },
+                                                            {
+                                                                "title": "Vendor:",
+                                                                "value": "@{body('Extract_invoice_data')?['vendor']}"
+                                                            },
+                                                            {
+                                                                "title": "Invoice #:",
+                                                                "value": "@{body('Extract_invoice_data')?['invoice_number']}"
+                                                            },
+                                                            {
+                                                                "title": "Total:",
+                                                                "value": "@{body('Extract_invoice_data')?['currency']} @{body('Extract_invoice_data')?['total']}"
+                                                            },
+                                                            {
+                                                                "title": "Confidence:",
+                                                                "value": "@{formatNumber(mul(body('Extract_invoice_data')?['confidence'], 100), '0.0')}%"
+                                                            },
+                                                            {
+                                                                "title": "Reason:",
+                                                                "value": "@{body('Validate_for_approval')?['reason']}"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "type": "TextBlock",
+                                                        "text": "**Failed Checks:**",
+                                                        "weight": "Bolder",
+                                                        "spacing": "Medium"
+                                                    },
+                                                    {
+                                                        "type": "TextBlock",
+                                                        "text": "@{if(equals(body('Validate_for_approval')?['checks']?['amount_within_limit'], false), '❌ Amount exceeds limit\n', '')}@{if(equals(body('Validate_for_approval')?['checks']?['confidence_sufficient'], false), '❌ Low confidence\n', '')}@{if(equals(body('Validate_for_approval')?['checks']?['document_type_is_invoice'], false), '❌ Not classified as invoice\n', '')}@{if(equals(body('Validate_for_approval')?['checks']?['document_type_not_receipt'], false), '❌ Classified as receipt\n', '')}@{if(equals(body('Validate_for_approval')?['checks']?['bill_to_authorized'], false), '❌ Bill-to company not authorized\n', '')}",
+                                                        "wrap": true
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "description": "Send Adaptive Card to Teams for pending invoice with failure details"
+                        }
+                    }
+                },
+                "expression": {
+                    "and": [
+                        {
+                            "equals": [
+                                "@body('Validate_for_approval')?['approved']",
+                                true
+                            ]
+                        }
+                    ]
+                },
+                "type": "If",
+                "description": "Route based on FastAPI validation decision"
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "FASTAPI_BASE_URL": {
+                "defaultValue": "YOUR_FASTAPI_BASE_URL",
+                "type": "String"
+            },
+            "TEAMS_WEBHOOK_URL": {
+                "defaultValue": "YOUR_TEAMS_WEBHOOK_URL",
+                "type": "String"
+            },
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "FASTAPI_BASE_URL": {
+            "value": "YOUR_FASTAPI_BASE_URL"
+        },
+        "TEAMS_WEBHOOK_URL": {
+            "value": "YOUR_TEAMS_WEBHOOK_URL"
+        },
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "sharepointonline": {
+                    "id": "/subscriptions/YOUR_SUBSCRIPTION_ID/providers/Microsoft.Web/locations/westus2/managedApis/sharepointonline",
+                    "connectionId": "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/rg-adl-m365/providers/Microsoft.Web/connections/sharepoint",
+                    "connectionName": "sharepoint"
+                }
+            }
+        }
+    }
+}
