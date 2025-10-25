@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # API Base URL (for approval links in Teams cards)
     api_base_url: str = Field("http://127.0.0.1:8000", alias="API_BASE_URL")
 
+    # CORS allowed origins (comma-separated list for production deployment)
+    cors_origins: str = Field("http://localhost:3000,http://127.0.0.1:3000", alias="CORS_ORIGINS")
+
     # Observability
     appinsights_connection_string: str | None = Field(default=None, alias="APPINSIGHTS_CONNECTION_STRING")
 
@@ -37,6 +40,7 @@ class Settings(BaseSettings):
     approval_min_confidence: float = Field(0.85, alias="APPROVAL_MIN_CONFIDENCE")
     approval_require_invoice_keyword: bool = Field(True, alias="APPROVAL_REQUIRE_INVOICE_KEYWORD")
     approval_reject_receipt_keyword: bool = Field(True, alias="APPROVAL_REJECT_RECEIPT_KEYWORD")
+    approval_allowed_bill_to_names: str = Field("", alias="APPROVAL_ALLOWED_BILL_TO_NAMES")  # Comma-separated list
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

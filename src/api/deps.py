@@ -8,3 +8,5 @@ class ExtractResponse(BaseModel):
     total: float | None = None
     currency: str | None = None
     confidence: float = 0.0
+    content: str | None = None  # Full OCR text content for validation
+    bill_to: str | None = None  # Customer/recipient name from invoice

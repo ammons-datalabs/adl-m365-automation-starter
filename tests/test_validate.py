@@ -15,8 +15,9 @@ def test_validate_approved_invoice():
     payload = {
         "amount": 450.00,
         "confidence": 0.92,
-        "content": "INVOICE\nVendor: ACME Corp\nTotal: $450.00",
-        "vendor": "ACME Corp"
+        "content": "INVOICE\nVendor: ACME Corp\nAmount Due: $450.00\nPlease remit payment",
+        "vendor": "ACME Corp",
+        "bill_to": None  # Optional field
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -27,8 +28,9 @@ def test_validate_approved_invoice():
     assert "auto-approved" in data["reason"].lower()
     assert data["checks"]["amount_within_limit"] is True
     assert data["checks"]["confidence_sufficient"] is True
-    assert data["checks"]["contains_invoice_keyword"] is True
-    assert data["checks"]["does_not_contain_receipt_keyword"] is True
+    assert data["checks"]["document_type_is_invoice"] is True
+    assert data["checks"]["document_type_not_receipt"] is True
+    assert data["checks"]["bill_to_authorized"] is True
 
 
 def test_validate_rejected_high_amount():
@@ -68,11 +70,11 @@ def test_validate_rejected_low_confidence():
 
 
 def test_validate_rejected_receipt():
-    """Test validation rejects documents containing 'receipt'"""
+    """Test validation rejects documents with receipt indicators"""
     payload = {
         "amount": 100.00,
         "confidence": 0.95,
-        "content": "RECEIPT\nVendor: Coffee Shop\nTotal: $100.00",  # Contains "receipt"
+        "content": "RECEIPT\nAmount Paid: $100.00\nThank you for your payment\nVisa ending 1234",
         "vendor": "Coffee Shop"
     }
 
@@ -82,15 +84,15 @@ def test_validate_rejected_receipt():
     data = response.json()
     assert data["approved"] is False
     assert "receipt" in data["reason"].lower()
-    assert data["checks"]["does_not_contain_receipt_keyword"] is False
+    assert data["checks"]["document_type_not_receipt"] is False
 
 
-def test_validate_rejected_no_invoice_keyword():
-    """Test validation rejects documents without 'invoice' keyword"""
+def test_validate_rejected_no_invoice_indicators():
+    """Test validation rejects documents without invoice obligation indicators"""
     payload = {
         "amount": 100.00,
         "confidence": 0.95,
-        "content": "Bill\nVendor: Some Corp\nTotal: $100.00",  # No "invoice"
+        "content": "Quote\nEstimated Total: $100.00\nValid until: 2025-12-31",  # Quote, not invoice
         "vendor": "Some Corp"
     }
 
@@ -99,7 +101,7 @@ def test_validate_rejected_no_invoice_keyword():
 
     data = response.json()
     assert data["approved"] is False
-    assert data["checks"]["contains_invoice_keyword"] is False
+    assert data["checks"]["document_type_is_invoice"] is False
 
 
 def test_validate_rejected_multiple_failures():
@@ -107,7 +109,7 @@ def test_validate_rejected_multiple_failures():
     payload = {
         "amount": 800.00,  # Too high
         "confidence": 0.75,  # Too low
-        "content": "RECEIPT\nVendor: Big Corp\nTotal: $800.00",  # Receipt, not invoice
+        "content": "RECEIPT\nAmount Paid: $800.00\nPayment received via Mastercard",  # Receipt
         "vendor": "Big Corp"
     }
 
@@ -120,7 +122,7 @@ def test_validate_rejected_multiple_failures():
     # Should fail multiple checks
     assert data["checks"]["amount_within_limit"] is False
     assert data["checks"]["confidence_sufficient"] is False
-    assert data["checks"]["does_not_contain_receipt_keyword"] is False
+    assert data["checks"]["document_type_not_receipt"] is False
 
     # Reason should mention multiple issues
     reason = data["reason"].lower()
@@ -154,7 +156,7 @@ def test_validate_edge_case_exactly_500():
     payload = {
         "amount": 500.00,  # Exactly at threshold
         "confidence": 0.85,  # Exactly at threshold
-        "content": "INVOICE\nVendor: Edge Corp\nTotal: $500.00",
+        "content": "INVOICE\nVendor: Edge Corp\nAmount Due: $500.00\nDue Date: 2025-11-15",
         "vendor": "Edge Corp"
     }
 

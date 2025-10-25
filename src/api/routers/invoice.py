@@ -17,7 +17,8 @@ class ValidateRequest(BaseModel):
     amount: float
     confidence: float
     content: str
-    vendor: str = None
+    vendor: str | None = None
+    bill_to: str | None = None
 
 
 class ValidateResponse(BaseModel):
@@ -59,6 +60,8 @@ async def extract(request: Request, file: UploadFile = File(None)):
             total=extracted.total,
             currency=extracted.currency,
             confidence=extracted.confidence,
+            content=extracted.content,
+            bill_to=extracted.bill_to,
         )
     except HTTPException:
         raise
@@ -103,12 +106,23 @@ async def validate_for_approval(req: ValidateRequest):
     }
     """
     try:
+        from loguru import logger
+        logger.info(
+            "Validation request received",
+            amount=req.amount,
+            confidence=req.confidence,
+            vendor=req.vendor,
+            bill_to=req.bill_to,
+            content_length=len(req.content) if req.content else 0
+        )
+
         rules = create_approval_rules()
         decision = rules.evaluate(
             amount=req.amount,
             confidence=req.confidence,
             content=req.content,
-            vendor=req.vendor
+            vendor=req.vendor,
+            bill_to=req.bill_to
         )
 
         return ValidateResponse(
@@ -118,6 +132,8 @@ async def validate_for_approval(req: ValidateRequest):
             metadata=decision.metadata
         )
     except Exception as e:
+        from loguru import logger
+        logger.error(f"Validation failed: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
