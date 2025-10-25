@@ -16,7 +16,7 @@ class ValidateRequest(BaseModel):
     """Request body for /invoices/validate endpoint"""
     amount: float
     confidence: float
-    content: str
+    content: str | None = ""  # Optional OCR content for document classification
     vendor: str | None = None
     bill_to: str | None = None
 

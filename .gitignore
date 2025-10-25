@@ -23,3 +23,6 @@ build/
 artifacts/
 coverage/
 reports/
+
+# Logic App definitions with sensitive URLs/webhooks
+infra/logic-app-definition-fastapi.json
