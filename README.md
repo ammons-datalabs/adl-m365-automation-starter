@@ -44,7 +44,47 @@ flowchart LR
 
 ## Quick start
 
-### Prerequisites
+### Run with Docker (Fastest)
+
+Build and run the API locally with Docker:
+
+```bash
+# From repo root
+docker build -t adl-m365-api .
+
+# Run with environment variables
+docker run --rm -p 8000:8000 \
+  -e AZ_DI_ENDPOINT=https://your-di.cognitiveservices.azure.com/ \
+  -e AZ_DI_KEY=your-key-here \
+  -e TEAMS_WEBHOOK_URL=your-webhook-url \
+  adl-m365-api
+
+# Open http://localhost:8000/docs for interactive API documentation
+# Open http://localhost:8000/health for health check
+```
+
+**Multi-platform build** (Apple Silicon + Intel):
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 -t adl-m365-api .
+```
+
+**Docker Compose** (optional, for development):
+```yaml
+version: '3.8'
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - AZ_DI_ENDPOINT=${AZ_DI_ENDPOINT}
+      - AZ_DI_KEY=${AZ_DI_KEY}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL}
+    volumes:
+      - ./src:/app/src  # Hot reload for development
+```
+
+### Prerequisites (Azure Setup)
 - Azure subscription
 - SharePoint Online site
 - Microsoft Teams channel

@@ -46,7 +46,7 @@ const UploadPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [authorizedCompanies, setAuthorizedCompanies] = useState<string>('My Company Pty Ltd, Acme Corporation');
+  const [authorizedCompanies, setAuthorizedCompanies] = useState<string>('Ammons DataLabs');
 
   const handleFilesAccepted = useCallback(async (files: File[]) => {
     if (files.length === 0) return;

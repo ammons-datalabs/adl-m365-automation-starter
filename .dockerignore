@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Environment
+.env
+.env.*
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# Azure
+.azure/
+
+# Node (for web frontend)
+web/node_modules/
+web/.next/
+web/out/
+web/build/
+
+# Samples and tests
+samples/
+tests/
+.pytest_cache/
+
+# CI/CD
+pipelines/
+
+# Infrastructure
+infra/bicep/

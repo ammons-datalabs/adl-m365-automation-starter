@@ -67,7 +67,7 @@ def classify_document_type(text: str) -> Literal["receipt", "invoice", "unknown"
     # Invoice identification (+2)
     if "invoice" in t and "receipt" not in t:
         score += 2
-    if "invoice number" in t or "invoice #" in t or "invoice no" in t:
+    if "invoice number" in t or "invoice #" in t or "invoice no" in t or "invoice id" in t:
         score += 2
 
     # ========== CONFIRMATION CUES (-) ==========
@@ -158,6 +158,10 @@ class InvoiceApprovalRules:
     - Set via environment variables (see .env.example)
     - Can be overridden per request
     - Allows different rules for dev/staging/prod
+
+    Future Enhancements:
+    - TODO: Validate invoice math (line items sum to subtotal, subtotal + tax = total)
+      This would catch data entry errors and potential fraud
     """
 
     def __init__(self, config: ApprovalRulesConfig = None):

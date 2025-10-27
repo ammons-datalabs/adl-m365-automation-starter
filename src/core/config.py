@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     approval_min_confidence: float = Field(0.85, alias="APPROVAL_MIN_CONFIDENCE")
     approval_require_invoice_keyword: bool = Field(True, alias="APPROVAL_REQUIRE_INVOICE_KEYWORD")
     approval_reject_receipt_keyword: bool = Field(True, alias="APPROVAL_REJECT_RECEIPT_KEYWORD")
-    approval_allowed_bill_to_names: str = Field("", alias="APPROVAL_ALLOWED_BILL_TO_NAMES")  # Comma-separated list
+    approval_allowed_bill_to_names: str = Field("Ammons DataLabs", alias="APPROVAL_ALLOWED_BILL_TO_NAMES")  # Comma-separated list
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

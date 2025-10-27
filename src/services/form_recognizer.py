@@ -152,10 +152,10 @@ def extract_invoice_fields(file_bytes: bytes) -> ExtractedInvoice:
             vendor="Contoso Pty Ltd",
             invoice_number="INV-10023",
             invoice_date="2025-09-30",
-            total=1234.56,
+            total=385.00,
             currency="AUD",
             confidence=conf,
             raw_chars=text_len,
-            content="INVOICE\nContoso Pty Ltd\nInvoice #: INV-10023\nTotal: AUD 1234.56",
-            bill_to="My Company Pty Ltd"
+            content="INVOICE\nContoso Pty Ltd\nInvoice #: INV-10023\nTotal: AUD 385.00\nDue Date: 2025-10-15",
+            bill_to="Ammons DataLabs"
         )

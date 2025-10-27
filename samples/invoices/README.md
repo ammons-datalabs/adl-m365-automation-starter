@@ -1,6 +1,21 @@
 # Sample Invoices for Testing
 
-This folder contains sample invoice PDFs for testing the Logic App workflow.
+This folder contains sample invoice PDFs for testing the invoice automation workflow.
+
+## Quick Test (Docker + Web UI)
+
+For rapid testing with Docker and the web UI at http://localhost:3000/upload:
+
+**Setup:** Set authorized companies to `Ammons DataLabs` in the UI input field
+
+**✅ Auto-Approve Test:** Use `simple-invoice-below-500.pdf`
+- Bill To: Ammons DataLabs
+- Expected: Green approval status, all checks pass
+- Amount: ≤ $500, Confidence: > 85%, Type: Invoice
+
+**❌ Manual Review Test:** Use `invoice-above-500.pdf`
+- Expected: Amber pending status, amount check fails
+- Amount: > $500 (exceeds threshold)
 
 ## Test Scenarios
 
