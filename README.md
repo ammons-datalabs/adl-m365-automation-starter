@@ -1,6 +1,7 @@
 # ADL M365 Automation Starter
 
 ![CI](https://github.com/ammons-datalabs/adl-m365-automation-starter/actions/workflows/ci-deploy.yml/badge.svg)
+![Docker Build](https://github.com/ammons-datalabs/adl-m365-automation-starter/actions/workflows/docker-build.yml/badge.svg)
 ![Coverage ≥ 80 %](https://img.shields.io/badge/coverage-80%25-brightgreen)
 ![Tests: 73+](https://img.shields.io/badge/tests-73%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
@@ -9,6 +10,62 @@
 > Enterprise-grade **intelligent invoice processing system** with **FastAPI**, **Azure Document Intelligence**, **Logic Apps**, and **Teams** — featuring comprehensive test coverage, WCAG AA accessible UI, and intelligent document classification.
 
  **[Watch the 2.5 minute demo →](https://youtu.be/a_5d8T2u-dQ)**
+
+---
+
+## Quickstart
+
+### Option A: Docker (Recommended)
+
+```bash
+# Build and run with Docker
+docker build -t adl-m365-api .
+docker run --rm -p 8000:8000 \
+  -e AZ_DI_ENDPOINT=https://your-di.cognitiveservices.azure.com/ \
+  -e AZ_DI_API_KEY=your-key-here \
+  -e TEAMS_WEBHOOK_URL=your-webhook-url \
+  adl-m365-api
+```
+
+**Open:** http://localhost:8000/docs (OpenAPI) • http://localhost:8000/health (Health Check)
+
+### Option B: Docker Compose (Local Dev)
+
+```yaml
+# docker-compose.yml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      - AZ_DI_ENDPOINT=${AZ_DI_ENDPOINT}
+      - AZ_DI_API_KEY=${AZ_DI_API_KEY}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL}
+    env_file: .env
+```
+
+```bash
+docker compose up --build
+```
+
+### Option C: Local Python
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+```
+
+---
+
+## Features at a glance
+
+- **FastAPI service** with OpenAPI docs (`/docs`) and healthcheck (`/health`)
+- **Invoice extraction + validation**: amount thresholds, confidence checks, bill-to verification
+- **Intelligent document classification**: semantic analysis distinguishes invoices from receipts
+- **Teams notifications**: auto-approve vs. manual-review routing with adaptive cards
+- **Containerized**: Docker build + run in one command
+- **CI-ready**: 73+ tests (80%+ coverage), automated Docker builds, OIDC deployment
 
 ---
 
@@ -83,6 +140,19 @@ services:
     volumes:
       - ./src:/app/src  # Hot reload for development
 ```
+
+### Environment Variables
+
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `AZ_DI_ENDPOINT` | Azure Document Intelligence endpoint URL | Yes (for real extraction) |
+| `AZ_DI_API_KEY` | Azure Document Intelligence API key | Yes (for real extraction) |
+| `TEAMS_WEBHOOK_URL` | Microsoft Teams incoming webhook URL | Optional |
+| `APPROVAL_AMOUNT_THRESHOLD` | Maximum amount for auto-approval (default: 500.0) | No |
+| `APPROVAL_MIN_CONFIDENCE` | Minimum confidence for auto-approval (default: 0.85) | No |
+| `APPROVAL_ALLOWED_BILL_TO_NAMES` | Comma-separated list of authorized companies (empty = accept all) | No |
+
+**Tip:** Create a `.env` file in the repo root and use it with Docker Compose or local development. See `.env.example` for all available configuration options.
 
 ### Prerequisites (Azure Setup)
 - Azure subscription
