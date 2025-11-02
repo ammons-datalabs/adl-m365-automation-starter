@@ -19,6 +19,7 @@ class ValidateRequest(BaseModel):
     content: str | None = ""  # Optional OCR content for document classification
     vendor: str | None = None
     bill_to: str | None = None
+    bill_to_authorized: list[str] | None = None  # Optional list of authorized bill-to companies
 
 
 class ValidateResponse(BaseModel):
@@ -113,10 +114,11 @@ async def validate_for_approval(req: ValidateRequest):
             confidence=req.confidence,
             vendor=req.vendor,
             bill_to=req.bill_to,
+            bill_to_authorized=req.bill_to_authorized,
             content_length=len(req.content) if req.content else 0
         )
 
-        rules = create_approval_rules()
+        rules = create_approval_rules(allowed_bill_to_names=req.bill_to_authorized)
         decision = rules.evaluate(
             amount=req.amount,
             confidence=req.confidence,
