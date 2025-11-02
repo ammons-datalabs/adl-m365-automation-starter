@@ -3,7 +3,7 @@
 ![CI](https://github.com/ammons-datalabs/adl-m365-automation-starter/actions/workflows/ci-deploy.yml/badge.svg)
 ![Docker Build](https://github.com/ammons-datalabs/adl-m365-automation-starter/actions/workflows/docker-build.yml/badge.svg)
 ![Coverage ≥ 80 %](https://img.shields.io/badge/coverage-80%25-brightgreen)
-![Tests: 73+](https://img.shields.io/badge/tests-73%2B-blue)
+![Tests: 47+](https://img.shields.io/badge/tests-47%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
 > **Production-Ready AI + Automation across Microsoft 365**
@@ -65,14 +65,14 @@ uvicorn src.api.main:app --host 0.0.0.0 --port 8000
 - **Intelligent document classification**: semantic analysis distinguishes invoices from receipts
 - **Teams notifications**: auto-approve vs. manual-review routing with adaptive cards
 - **Containerized**: Docker build + run in one command
-- **CI-ready**: 73+ tests (80%+ coverage), automated Docker builds, OIDC deployment
+- **CI-ready**: 47+ tests (80%+ coverage), automated Docker builds, OIDC deployment
 
 ---
 
 ## Why this repo
 - **Production-ready invoice automation**: Extract → Validate → Route → Approve with intelligent business rules
 - **FastAPI-first architecture**: Reusable API endpoints for Logic Apps, Power Automate, and web UI
-- **Comprehensive testing**: 73+ tests covering extraction, validation, classification, and approval workflows
+- **Comprehensive testing**: 47+ tests covering extraction, validation, classification, and approval workflows
 - **Intelligent document classification**: Payment obligation detection (invoices vs. receipts) using semantic analysis
 - **Bill-to verification**: Company whitelist validation for fraud prevention
 - **Modern accessible UI**: WCAG AA compliant, colorblind-safe, light/dark theme support
@@ -274,7 +274,7 @@ Validates that invoices are addressed to authorized companies:
 
 **Key improvements**:
 - ✅ Reusable validation logic across Logic Apps, Power Automate, web UI
-- ✅ Testable business rules (73+ pytest tests)
+- ✅ Testable business rules (47+ pytest tests)
 - ✅ Detailed check results in Teams notifications
 - ✅ Sequential processing with concurrency control
 - ✅ Comprehensive adaptive cards with failure details
@@ -307,32 +307,45 @@ Create `web/.env.local`:
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000  # or your Azure Web App URL
 ```
 
-## Testing (73+ tests, 80%+ coverage)
+## Testing (47+ tests, 80%+ coverage)
 
 **Test suite**: `tests/` directory
 
 ### Coverage areas
-1. **Invoice extraction** (`test_invoice_extraction.py`): 23 tests
-   - Azure DI integration, field parsing, confidence scoring
-   - Multipage documents, missing fields, malformed responses
-   - Bill-to extraction and validation
+1. **Bill-to whitelist verification** (`test_bill_to_whitelist.py`): 12 tests
+   - Company name validation and fuzzy matching
+   - Case-insensitive and partial matching
+   - Whitelist enforcement and edge cases
 
-2. **Validation rules** (`test_validation_rules.py`): 17 tests
-   - Amount thresholds, confidence requirements
+2. **Real invoice integration** (`test_integration_real_invoices.py`): 9 tests
+   - End-to-end testing with actual invoice samples
+   - Azure DI integration validation
+   - Complete approval workflow testing
+
+3. **Invoice validation** (`test_validate.py`): 8 tests
+   - Amount thresholds and confidence checks
    - Document classification (invoice vs receipt)
-   - Bill-to authorization checks
-   - Edge cases and boundary conditions
+   - Business rule validation
 
-3. **Document classification** (`test_document_classification.py`): 12 tests
-   - Payment obligation detection (invoices)
-   - Payment confirmation detection (receipts)
-   - Semantic analysis of keywords and context
+4. **Approval workflow** (`test_approval_workflow.py`): 7 tests
+   - Approval/rejection flow
+   - Status transitions and tracking
+   - Multi-step approval processes
 
-4. **API endpoints** (`test_api_endpoints.py`): 21 tests
-   - `/extract`, `/validate`, `/process` endpoints
-   - Request validation, error handling
-   - Binary and multipart file uploads
-   - Approval tracking and listing
+5. **Invoice extraction** (`test_extract.py`): 5 tests
+   - Azure DI integration and field parsing
+   - Confidence scoring and data extraction
+
+6. **Process endpoint** (`test_process.py`): 3 tests
+   - End-to-end invoice processing
+   - Automatic routing logic
+
+7. **Approval actions** (`test_approve.py`): 2 tests
+   - Approval decision tracking
+   - Action validation
+
+8. **Health checks** (`test_health.py`): 1 test
+   - API health endpoint validation
 
 ### Running tests
 ```bash
@@ -343,10 +356,10 @@ pip install -r requirements.txt
 pytest --cov=src --cov-report=html --cov-report=term
 
 # Run specific test file
-pytest tests/test_validation_rules.py -v
+pytest tests/test_validate.py -v
 
 # Run with live Azure DI (set AZ_DI_ENDPOINT and AZ_DI_KEY)
-pytest tests/test_invoice_extraction.py --run-live
+pytest tests/test_integration_real_invoices.py --run-live
 ```
 
 ## CI/CD with GitHub Actions
@@ -419,35 +432,46 @@ Add these repository secrets (Settings → Secrets and variables → Actions):
 ```
 src/                          # FastAPI application
 ├── api/                      # API endpoints and routing
-│   ├── main.py              # FastAPI app initialization
+│   ├── main.py              # FastAPI app initialization with CORS
 │   ├── deps.py              # Shared dependencies and models
 │   └── routers/             # API route handlers
-│       └── invoice.py       # Invoice endpoints: extract, validate, process
+│       ├── invoice.py       # Invoice endpoints: extract, validate, process
+│       └── health.py        # Health check endpoint
 ├── services/                # Business logic layer
 │   ├── form_recognizer.py  # Azure DI integration
-│   ├── approval_rules.py   # Validation business rules
-│   ├── document_classifier.py  # Invoice vs receipt detection
-│   ├── storage.py          # Approval tracker (in-memory)
+│   ├── approval_rules.py   # Validation business rules + document classification
+│   ├── invoice_types.py    # Type definitions for invoice processing
+│   ├── storage/             # Data persistence
+│   │   └── approvals.py    # Approval tracker (in-memory)
 │   └── graph.py            # Teams integration
-└── models/                  # Pydantic data models
-    └── invoice.py          # Invoice and approval request models
+├── models/                  # Pydantic data models
+│   └── invoice.py          # Invoice and approval request models
+└── core/                    # Core utilities
+    ├── config.py           # Configuration management
+    └── logging.py          # Logging setup
 
 web/                         # Next.js web UI
 ├── app/                     # Next.js 13+ app directory
-│   ├── globals.css         # Design system (849 lines)
+│   ├── globals.css         # Design system (17KB)
 │   ├── layout.tsx          # Root layout with theme provider
+│   ├── page.tsx            # Home page
 │   └── upload/             # Upload page
+│       └── page.tsx        # Invoice upload interface
 └── components/              # React components
     ├── ThemeProvider.tsx   # Theme context and localStorage
     ├── ThemeToggle.tsx     # Light/dark theme toggle
     ├── DragDropArea.tsx    # File upload component
     └── ExtractedDataDisplay.tsx  # Results display
 
-tests/                       # Pytest test suite (73+ tests)
-├── test_invoice_extraction.py      # 23 tests: Azure DI integration
-├── test_validation_rules.py        # 17 tests: Business rules
-├── test_document_classification.py # 12 tests: Invoice vs receipt
-└── test_api_endpoints.py           # 21 tests: API integration
+tests/                       # Pytest test suite (47+ tests)
+├── test_bill_to_whitelist.py        # 12 tests: Bill-to verification
+├── test_integration_real_invoices.py # 9 tests: End-to-end integration
+├── test_validate.py                 # 8 tests: Validation rules
+├── test_approval_workflow.py        # 7 tests: Approval flow
+├── test_extract.py                  # 5 tests: Invoice extraction
+├── test_process.py                  # 3 tests: Process endpoint
+├── test_approve.py                  # 2 tests: Approval actions
+└── test_health.py                   # 1 test: Health endpoint
 
 docs/                        # Setup guides
 ├── LOGIC_APPS_SETUP.md     # Logic Apps configuration
@@ -498,7 +522,7 @@ samples/                     # Sample invoices for testing
 
 ### 2025-01 (FastAPI + Testing)
 - ✅ **FastAPI architecture**: Reusable API endpoints for all integrations
-- ✅ **73+ comprehensive tests**: 80%+ coverage across extraction, validation, classification
+- ✅ **47+ comprehensive tests**: 80%+ coverage across extraction, validation, classification
 - ✅ **Intelligent classification**: Semantic analysis of payment obligation vs confirmation
 - ✅ **Bill-to verification**: Company whitelist validation for fraud prevention
 - ✅ **Modern Logic App**: FastAPI integration with adaptive cards
