@@ -24,5 +24,10 @@ artifacts/
 coverage/
 reports/
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Logic App definitions with sensitive URLs/webhooks
 infra/logic-app-definition-fastapi.json

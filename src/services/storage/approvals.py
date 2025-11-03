@@ -5,9 +5,10 @@ In production, use a database (SQL, Cosmos DB, etc.)
 from datetime import datetime
 from typing import Dict, Optional
 import uuid
+from .approval_tracker_base import ApprovalTrackerBase
 
 
-class ApprovalTracker:
+class ApprovalTracker(ApprovalTrackerBase):
     def __init__(self):
         self._approvals: Dict[str, dict] = {}
 
