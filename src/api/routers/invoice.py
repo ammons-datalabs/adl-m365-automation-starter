@@ -8,6 +8,7 @@ from ...services.graph import post_approval_card
 from ...services.storage import approval_tracker
 from ...services.approval_rules import create_approval_rules
 from ...models.invoice import ApprovalRequest
+from ...services.events.event_publisher import get_event_publisher, InvoiceValidatedEvent
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
@@ -126,6 +127,24 @@ async def validate_for_approval(req: ValidateRequest):
             vendor=req.vendor,
             bill_to=req.bill_to
         )
+
+        # Publish InvoiceValidated event to Service Bus
+        try:
+            event_publisher = get_event_publisher()
+            event = InvoiceValidatedEvent(
+                approval_id=f"validation-{hash((req.vendor, req.amount, req.confidence))}",
+                vendor=req.vendor or "Unknown",
+                invoice_number="N/A",  # Not available at validation stage
+                total=req.amount,
+                approved=decision.approved,
+                reason=decision.reason,
+                confidence=req.confidence
+            )
+            event_publisher.publish_invoice_validated(event)
+            logger.info(f"Published InvoiceValidated event: approved={decision.approved}")
+        except Exception as e:
+            # Don't fail validation if event publishing fails
+            logger.warning(f"Failed to publish event: {e}")
 
         return ValidateResponse(
             approved=decision.approved,
