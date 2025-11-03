@@ -27,9 +27,9 @@ flowchart TB
     end
 
     subgraph Backend["FastAPI Backend"]
-        C1[/extract endpoint]
-        C2[/validate endpoint]
-        C3[/process endpoint]
+        C1["POST /extract"]
+        C2["POST /validate"]
+        C3["POST /process"]
         D[Business Logic<br/>approval_rules.py]
     end
 
@@ -65,10 +65,10 @@ flowchart TB
     C3 --> H
     G --> I1 & I2 & I3
 
-    style B fill:#e1f5ff
-    style F fill:#fff4e6
-    style G fill:#f3e5f5
-    style E1 fill:#e8f5e9
+    style B fill:#0078d4,stroke:#003d6b,stroke-width:3px,color:#fff
+    style F fill:#ff8c00,stroke:#cc6f00,stroke-width:3px,color:#000
+    style G fill:#9333ea,stroke:#6b21a8,stroke-width:3px,color:#fff
+    style E1 fill:#2e7d32,stroke:#1b5e20,stroke-width:3px,color:#fff
 ```
 
 ## Component Responsibilities
@@ -424,57 +424,57 @@ Azure DI (cloud) + SQLite (local) + Service Bus (optional local emulator)
 ┌─────────────────────────────────────────────────────┐
 │ Azure Subscription                                  │
 │                                                     │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ Resource Group: rg-invoice-automation        │  │
-│  │                                               │  │
-│  │  ┌────────────────────────────────────────┐  │  │
-│  │  │ Azure API Management                   │  │  │
-│  │  │ - Developer/Standard SKU               │  │  │
-│  │  │ - Public endpoint with custom domain   │  │  │
-│  │  └───────────────┬────────────────────────┘  │  │
-│  │                  ↓                            │  │
-│  │  ┌────────────────────────────────────────┐  │  │
-│  │  │ Azure Web App (FastAPI)                │  │  │
-│  │  │ - Linux Python 3.11                    │  │  │
-│  │  │ - Auto-scaling enabled                 │  │  │
-│  │  │ - VNET integration (optional)          │  │  │
-│  │  └───────┬──────────────────┬─────────────┘  │  │
-│  │          ↓                  ↓                 │  │
-│  │  ┌──────────────┐  ┌──────────────────────┐  │  │
-│  │  │ Azure DI     │  │ Service Bus Namespace│  │  │
-│  │  │ (Form Recog) │  │ - Queue: invoice-evt │  │  │
-│  │  └──────────────┘  └──────────────────────┘  │  │
-│  │                                               │  │
-│  │  ┌────────────────────────────────────────┐  │  │
-│  │  │ Storage Options                        │  │  │
-│  │  │ - SQLite: File in /home (testing)      │  │  │
-│  │  │ - Azure SQL: Production scale          │  │  │
-│  │  │ - Cosmos DB: Global distribution       │  │  │
-│  │  └────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ Resource Group: rg-invoice-automation        │   │
+│  │                                              │   │
+│  │  ┌────────────────────────────────────────┐  │   │
+│  │  │ Azure API Management                   │  │   │
+│  │  │ - Developer/Standard SKU               │  │   │
+│  │  │ - Public endpoint with custom domain   │  │   │
+│  │  └───────────────┬────────────────────────┘  │   │
+│  │                  ↓                           │   │
+│  │  ┌────────────────────────────────────────┐  │   │
+│  │  │ Azure Web App (FastAPI)                │  │   │
+│  │  │ - Linux Python 3.11                    │  │   │
+│  │  │ - Auto-scaling enabled                 │  │   │
+│  │  │ - VNET integration (optional)          │  │   │
+│  │  └───────┬──────────────────┬─────────────┘  │   │
+│  │          ↓                  ↓                │   │
+│  │  ┌──────────────┐  ┌──────────────────────┐  │   │
+│  │  │ Azure DI     │  │ Service Bus Namespace│  │   │
+│  │  │ (Form Recog) │  │ - Queue: invoice-evt │  │   │
+│  │  └──────────────┘  └──────────────────────┘  │   │
+│  │                                              │   │
+│  │  ┌────────────────────────────────────────┐  │   │
+│  │  │ Storage Options                        │  │   │
+│  │  │ - SQLite: File in /home (testing)      │  │   │
+│  │  │ - Azure SQL: Production scale          │  │   │
+│  │  │ - Cosmos DB: Global distribution       │  │   │
+│  │  └────────────────────────────────────────┘  │   │
+│  └──────────────────────────────────────────────┘   │
 │                                                     │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ Azure Static Web Apps (Next.js UI)          │  │
-│  │ - Global CDN                                 │  │
-│  │ - Custom domain                              │  │
-│  └──────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ Azure Static Web Apps (Next.js UI)           │   │
+│  │ - Global CDN                                 │   │
+│  │ - Custom domain                              │   │
+│  └──────────────────────────────────────────────┘   │
 │                                                     │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ SharePoint Online (Document Library)        │  │
-│  │ ┌─────────────────────────────────────────┐  │  │
-│  │ │ Logic App (Standard)                    │  │  │
-│  │ │ - SharePoint connector                  │  │  │
-│  │ │ - HTTP actions to APIM                  │  │  │
-│  │ │ - Teams connector                       │  │  │
-│  │ └─────────────────────────────────────────┘  │  │
-│  └──────────────────────────────────────────────┘  │
+│  ┌─────────────────────────────────────────────┐    │
+│  │ SharePoint Online (Document Library)        │    │
+│  │ ┌─────────────────────────────────────────┐ │    │
+│  │ │ Logic App (Standard)                    │ │    │
+│  │ │ - SharePoint connector                  │ │    │
+│  │ │ - HTTP actions to APIM                  │ │    │
+│  │ │ - Teams connector                       │ │    │
+│  │ └─────────────────────────────────────────┘ │    │
+│  └─────────────────────────────────────────────┘    │
 │                                                     │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ Application Insights                         │  │
-│  │ - API telemetry                              │  │
-│  │ - Distributed tracing                        │  │
-│  │ - Custom metrics (approval rate, avg amount) │  │
-│  └──────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ Application Insights                         │   │
+│  │ - API telemetry                              │   │
+│  │ - Distributed tracing                        │   │
+│  │ - Custom metrics (approval rate, avg amount) │   │
+│  └──────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────┘
 ```
 

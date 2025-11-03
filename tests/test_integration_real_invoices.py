@@ -27,6 +27,7 @@ SAMPLES_DIR = Path(__file__).parent.parent / "samples" / "invoices"
 
 
 @skip_if_no_azure_di
+@pytest.mark.integration
 @pytest.mark.parametrize("invoice_file", [
     "invoice-CONTOSO-8890.pdf",
     "invoice-FOXRIVER-0421.pdf",
@@ -82,6 +83,7 @@ def test_extract_real_invoice_clean_scans(invoice_file):
 
 
 @skip_if_no_azure_di
+@pytest.mark.integration
 def test_extract_quote_should_be_rejected():
     """Test that quotes are detected and rejected (lack obligation cues)"""
     pdf_path = SAMPLES_DIR / "quote_006_design.pdf"
@@ -130,6 +132,7 @@ def test_extract_quote_should_be_rejected():
 
 
 @skip_if_no_azure_di
+@pytest.mark.integration
 def test_extract_receipt_ctrl_03():
     """Test that receipt_ctrl_03 is detected as receipt (not invoice)"""
     pdf_path = SAMPLES_DIR / "receipt_ctrl_03.pdf"
@@ -177,6 +180,7 @@ def test_extract_receipt_ctrl_03():
 
 
 @skip_if_no_azure_di
+@pytest.mark.integration
 @pytest.mark.parametrize("invoice_file", [
     "invoice-above-500.pdf",
 ])
@@ -203,6 +207,7 @@ def test_extract_high_value_invoice(invoice_file):
 
 
 @skip_if_no_azure_di
+@pytest.mark.integration
 def test_extract_handwritten_invoice():
     """Test extraction with handwritten invoice"""
     pdf_path = SAMPLES_DIR / "handwritten-Invoice.pdf"
@@ -229,6 +234,7 @@ def test_extract_handwritten_invoice():
 
 
 @skip_if_no_azure_di
+@pytest.mark.integration
 def test_extract_scratched_out_receipt():
     """Test that documents with 'Invoice' scratched out and replaced with 'Receipt' are detected"""
     pdf_path = SAMPLES_DIR / "handwritten-scratched-out-invoice-Reciept.pdf"
@@ -282,6 +288,7 @@ def test_extract_scratched_out_receipt():
 
 
 @skip_if_no_azure_di
+@pytest.mark.integration
 def test_extract_receipt_should_detect_non_invoice():
     """Test that receipts are detected (not invoices)"""
     pdf_path = SAMPLES_DIR / "Receipt-2372-1739-1702.pdf"
@@ -305,6 +312,7 @@ def test_extract_receipt_should_detect_non_invoice():
 
 
 @skip_if_no_azure_di
+@pytest.mark.integration
 def test_extract_raw_binary_with_real_invoice():
     """Test raw binary upload (Logic Apps style) with real invoice"""
     pdf_path = SAMPLES_DIR / "invoice-CONTOSO-8890.pdf"

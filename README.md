@@ -3,7 +3,7 @@
 ![CI](https://github.com/ammons-datalabs/adl-m365-automation-starter/actions/workflows/ci-deploy.yml/badge.svg)
 ![Docker Build](https://github.com/ammons-datalabs/adl-m365-automation-starter/actions/workflows/docker-build.yml/badge.svg)
 ![Coverage ≥ 80 %](https://img.shields.io/badge/coverage-80%25-brightgreen)
-![Tests: 47+](https://img.shields.io/badge/tests-47%2B-blue)
+![Tests: 65+](https://img.shields.io/badge/tests-65%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
 > **Production-Ready AI + Automation across Microsoft 365**
@@ -63,18 +63,23 @@ uvicorn src.api.main:app --host 0.0.0.0 --port 8000
 - **FastAPI service** with OpenAPI docs (`/docs`) and healthcheck (`/health`)
 - **Invoice extraction + validation**: amount thresholds, confidence checks, bill-to verification
 - **Intelligent document classification**: semantic analysis distinguishes invoices from receipts
+- **SQLite persistence**: Approval tracking with SQL queries and indexed searches
+- **Event-driven architecture**: Azure Service Bus integration for downstream processing
+- **API Management ready**: APIM policy snippets for production gateway
 - **Teams notifications**: auto-approve vs. manual-review routing with adaptive cards
 - **Containerized**: Docker build + run in one command
-- **CI-ready**: 47+ tests (80%+ coverage), automated Docker builds, OIDC deployment
+- **CI-ready**: 65+ tests (80%+ coverage), automated Docker builds, OIDC deployment
 
 ---
 
 ## Why this repo
 - **Production-ready invoice automation**: Extract → Validate → Route → Approve with intelligent business rules
 - **FastAPI-first architecture**: Reusable API endpoints for Logic Apps, Power Automate, and web UI
-- **Comprehensive testing**: 47+ tests covering extraction, validation, classification, and approval workflows
+- **Comprehensive testing**: 65+ tests covering extraction, validation, classification, persistence, and event publishing
 - **Intelligent document classification**: Payment obligation detection (invoices vs. receipts) using semantic analysis
 - **Bill-to verification**: Company whitelist validation for fraud prevention
+- **Event-driven architecture**: Azure Service Bus integration for downstream system integration
+- **Persistent storage**: SQLite approval tracking with SQL queries and indexes
 - **Modern accessible UI**: WCAG AA compliant, colorblind-safe, light/dark theme support
 - **Reduce manual review**: *> 80% of invoices auto-approved* when all criteria are met
 
@@ -274,7 +279,7 @@ Validates that invoices are addressed to authorized companies:
 
 **Key improvements**:
 - ✅ Reusable validation logic across Logic Apps, Power Automate, web UI
-- ✅ Testable business rules (47+ pytest tests)
+- ✅ Testable business rules (65+ pytest tests)
 - ✅ Detailed check results in Teams notifications
 - ✅ Sequential processing with concurrency control
 - ✅ Comprehensive adaptive cards with failure details
@@ -492,7 +497,7 @@ Client → APIM (validate subscription, apply policies) → FastAPI → Azure DI
 - What's the p95 latency for `/validate`?
 - How many requests failed authentication?
 
-## Testing (47+ tests, 80%+ coverage)
+## Testing (65+ tests, 80%+ coverage)
 
 **Test suite**: `tests/` directory
 
@@ -502,35 +507,50 @@ Client → APIM (validate subscription, apply policies) → FastAPI → Azure DI
    - Case-insensitive and partial matching
    - Whitelist enforcement and edge cases
 
-2. **Real invoice integration** (`test_integration_real_invoices.py`): 9 tests
+2. **SQLite persistence** (`test_sqlite_approvals.py`): 11 tests
+   - Approval tracking with SQL queries
+   - Status-based filtering and threshold queries
+   - Persistence across instances
+
+3. **Real invoice integration** (`test_integration_real_invoices.py`): 9 tests
    - End-to-end testing with actual invoice samples
    - Azure DI integration validation
    - Complete approval workflow testing
 
-3. **Invoice validation** (`test_validate.py`): 8 tests
+4. **Service Bus events** (`test_service_bus_events.py`): 8 tests
+   - Event structure and serialization
+   - Publishing to Azure Service Bus
+   - Event metadata and routing
+
+5. **Invoice validation** (`test_validate.py`): 8 tests
    - Amount thresholds and confidence checks
    - Document classification (invoice vs receipt)
    - Business rule validation
 
-4. **Approval workflow** (`test_approval_workflow.py`): 7 tests
+6. **Approval workflow** (`test_approval_workflow.py`): 7 tests
    - Approval/rejection flow
    - Status transitions and tracking
    - Multi-step approval processes
 
-5. **Invoice extraction** (`test_extract.py`): 5 tests
+7. **Invoice extraction** (`test_extract.py`): 5 tests
    - Azure DI integration and field parsing
    - Confidence scoring and data extraction
 
-6. **Process endpoint** (`test_process.py`): 3 tests
+8. **Service Bus integration** (`test_service_bus_integration.py`): 3 tests (requires --run-integration)
+   - Real Azure Service Bus Queue integration
+   - Event publishing and consumption
+   - Message cleanup and verification
+
+9. **Process endpoint** (`test_process.py`): 3 tests
    - End-to-end invoice processing
    - Automatic routing logic
 
-7. **Approval actions** (`test_approve.py`): 2 tests
-   - Approval decision tracking
-   - Action validation
+10. **Approval actions** (`test_approve.py`): 2 tests
+    - Approval decision tracking
+    - Action validation
 
-8. **Health checks** (`test_health.py`): 1 test
-   - API health endpoint validation
+11. **Health checks** (`test_health.py`): 1 test
+    - API health endpoint validation
 
 ### Running tests
 ```bash
@@ -627,7 +647,11 @@ src/                          # FastAPI application
 │   ├── approval_rules.py   # Validation business rules + document classification
 │   ├── invoice_types.py    # Type definitions for invoice processing
 │   ├── storage/             # Data persistence
-│   │   └── approvals.py    # Approval tracker (in-memory)
+│   │   ├── approval_tracker_base.py  # Repository pattern ABC
+│   │   ├── approvals.py             # Approval tracker (in-memory)
+│   │   └── approvals_sqlite.py      # SQLite persistent storage
+│   ├── events/              # Event publishing
+│   │   └── event_publisher.py       # Azure Service Bus integration
 │   └── graph.py            # Teams integration
 ├── models/                  # Pydantic data models
 │   └── invoice.py          # Invoice and approval request models
@@ -648,17 +672,22 @@ web/                         # Next.js web UI
     ├── DragDropArea.tsx    # File upload component
     └── ExtractedDataDisplay.tsx  # Results display
 
-tests/                       # Pytest test suite (47+ tests)
+tests/                       # Pytest test suite (65+ tests)
+├── conftest.py                      # Pytest configuration (integration test markers)
 ├── test_bill_to_whitelist.py        # 12 tests: Bill-to verification
+├── test_sqlite_approvals.py         # 11 tests: SQLite persistence
 ├── test_integration_real_invoices.py # 9 tests: End-to-end integration
+├── test_service_bus_events.py       # 8 tests: Service Bus unit tests
 ├── test_validate.py                 # 8 tests: Validation rules
 ├── test_approval_workflow.py        # 7 tests: Approval flow
 ├── test_extract.py                  # 5 tests: Invoice extraction
+├── test_service_bus_integration.py  # 3 tests: Real Service Bus (--run-integration)
 ├── test_process.py                  # 3 tests: Process endpoint
 ├── test_approve.py                  # 2 tests: Approval actions
 └── test_health.py                   # 1 test: Health endpoint
 
-docs/                        # Setup guides
+docs/                        # Setup guides and architecture
+├── INTEGRATION_DESIGN.md   # System architecture with sequence diagrams
 ├── LOGIC_APPS_SETUP.md     # Logic Apps configuration
 ├── SHAREPOINT_SETUP.md     # SharePoint library setup
 ├── POWER_AUTOMATE_INTEGRATION.md  # Power Automate workflows
@@ -670,6 +699,7 @@ infra/                       # Infrastructure definitions
 │   ├── rate-limit-policy.xml          # Rate limiting and quotas
 │   ├── cors-policy.xml                # Cross-origin request handling
 │   └── complete-policy-example.xml    # Combined production policy
+├── postman_collection.json  # API testing collection with automated tests
 ├── bicep/                   # Azure Bicep templates
 ├── logic-app-using-fastapi.json  # Modern Logic App (FastAPI integration)
 └── logic-app-definition.json     # Legacy Logic App (direct Azure DI calls)
@@ -710,9 +740,17 @@ samples/                     # Sample invoices for testing
 
 ## What's New (Recent Additions)
 
+### 2025-11 (Azure Integration Enhancements)
+- ✅ **SQLite persistence**: Repository pattern with SQL queries for approval tracking
+- ✅ **Event-driven architecture**: Azure Service Bus integration for downstream processing
+- ✅ **APIM ready**: Complete API Management policy snippets and documentation
+- ✅ **Integration design docs**: Comprehensive architecture documentation with sequence diagrams
+- ✅ **Postman collection**: Automated API tests with verified response formats
+- ✅ **19+ new tests**: SQLite persistence, Service Bus events, real Azure integration tests
+
 ### 2025-01 (FastAPI + Testing)
 - ✅ **FastAPI architecture**: Reusable API endpoints for all integrations
-- ✅ **47+ comprehensive tests**: 80%+ coverage across extraction, validation, classification
+- ✅ **Comprehensive testing**: TDD approach with 65+ tests, 80%+ coverage
 - ✅ **Intelligent classification**: Semantic analysis of payment obligation vs confirmation
 - ✅ **Bill-to verification**: Company whitelist validation for fraud prevention
 - ✅ **Modern Logic App**: FastAPI integration with adaptive cards

@@ -23,6 +23,8 @@ build/
 artifacts/
 coverage/
 reports/
+.coverage
+CHANGES_SUMMARY.md
 
 # Databases
 *.db

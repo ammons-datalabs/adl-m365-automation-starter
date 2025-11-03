@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Teams
     teams_webhook_url: str | None = Field(default=None, alias="TEAMS_WEBHOOK_URL")
 
+    # Azure Service Bus
+    service_bus_connection_string: str | None = Field(default=None, alias="SERVICE_BUS_CONNECTION_STRING")
+
     # API Base URL (for approval links in Teams cards)
     api_base_url: str = Field("http://127.0.0.1:8000", alias="API_BASE_URL")
 
