@@ -1,0 +1,107 @@
+<!--
+API Management: Complete Policy Example
+
+This demonstrates how to combine multiple policies for a production-ready API.
+
+Combines:
+- CORS for web browser access
+- Subscription key validation for authentication
+- Rate limiting to prevent abuse
+- Response caching for performance
+- Error handling and logging
+
+Apply at: API level or Product level in Azure API Management
+
+Setup:
+1. Create APIM instance in Azure
+2. Import your FastAPI OpenAPI spec or add API manually
+3. Apply this policy at the API level
+4. Create Products with different rate limits (free, standard, premium)
+-->
+<policies>
+    <inbound>
+        <!-- CORS: Allow web browsers to access API -->
+        <cors allow-credentials="true">
+            <allowed-origins>
+                <origin>http://localhost:3000</origin>
+                <!-- TODO: Add your production domains after deployment -->
+            </allowed-origins>
+            <allowed-methods>
+                <method>GET</method>
+                <method>POST</method>
+                <method>PUT</method>
+                <method>DELETE</method>
+                <method>OPTIONS</method>
+            </allowed-methods>
+            <allowed-headers>
+                <header>Content-Type</header>
+                <header>Authorization</header>
+                <header>Ocp-Apim-Subscription-Key</header>
+            </allowed-headers>
+        </cors>
+
+        <!-- Authentication: Validate subscription key -->
+        <check-header name="Ocp-Apim-Subscription-Key"
+                      failed-check-httpcode="401"
+                      failed-check-error-message="Missing or invalid subscription key">
+            <value>@(context.Request.Headers.GetValueOrDefault("Ocp-Apim-Subscription-Key",""))</value>
+        </check-header>
+
+        <!-- Rate limiting: Protect backend from overload -->
+        <rate-limit calls="100" renewal-period="60" />
+        <quota calls="10000" renewal-period="604800" />
+
+        <!-- Add subscription info to backend (optional) -->
+        <set-header name="X-Subscription-Name" exists-action="override">
+            <value>@(context.Subscription?.Name ?? "anonymous")</value>
+        </set-header>
+
+        <!-- Response caching for GET requests (optional) -->
+        <cache-lookup vary-by-developer="false"
+                      vary-by-developer-groups="false"
+                      downstream-caching-type="none">
+            <vary-by-query-parameter>*</vary-by-query-parameter>
+        </cache-lookup>
+
+        <base />
+    </inbound>
+
+    <backend>
+        <!-- Forward to FastAPI backend -->
+        <base />
+    </backend>
+
+    <outbound>
+        <!-- Cache successful GET responses for 60 seconds -->
+        <cache-store duration="60" />
+
+        <!-- Remove internal headers from response -->
+        <set-header name="X-Subscription-Name" exists-action="delete" />
+
+        <!-- Add security headers -->
+        <set-header name="X-Content-Type-Options" exists-action="override">
+            <value>nosniff</value>
+        </set-header>
+        <set-header name="X-Frame-Options" exists-action="override">
+            <value>DENY</value>
+        </set-header>
+
+        <base />
+    </outbound>
+
+    <on-error>
+        <!-- Return user-friendly error messages -->
+        <set-body>@{
+            return new JObject(
+                new JProperty("error", context.LastError.Message),
+                new JProperty("timestamp", DateTime.UtcNow.ToString("o"))
+            ).ToString();
+        }</set-body>
+
+        <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+        </set-header>
+
+        <base />
+    </on-error>
+</policies>

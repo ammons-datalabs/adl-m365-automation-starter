@@ -307,6 +307,191 @@ Create `web/.env.local`:
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000  # or your Azure Web App URL
 ```
 
+## Azure API Management (Production Gateway)
+
+**Location**: `infra/apim-policies/` directory
+
+Azure API Management (APIM) provides a production-ready gateway layer for the FastAPI backend, adding enterprise features without changing application code.
+
+### Why APIM?
+
+**For this invoice automation system:**
+- **Multi-client access control**: Different subscription keys for web UI, Power Automate, Logic Apps
+- **Rate limiting per client**: Prevent any single integration from overwhelming the backend
+- **CORS management**: Centralized cross-origin policy without touching FastAPI code
+- **Usage analytics**: Track which clients use which endpoints and how often
+- **Zero-downtime updates**: Route traffic between API versions during deployments
+- **Cost attribution**: See usage by department/team via subscription keys
+
+**General benefits:**
+- Authentication, throttling, caching, monitoring - all configurable via policies
+- No code changes required in FastAPI backend
+- Unified gateway for multiple backend services
+- Built-in developer portal for API consumers
+
+### Available Policy Snippets
+
+The `infra/apim-policies/` directory contains ready-to-use policy examples:
+
+1. **`subscription-key-policy.xml`**: Authentication via subscription keys
+   - Validates `Ocp-Apim-Subscription-Key` header
+   - Rejects unauthorized requests with 401
+   - Adds subscription info to backend headers
+
+2. **`rate-limit-policy.xml`**: Protect backend from overload
+   - 100 calls/minute per subscription
+   - 10,000 calls/week quota
+   - Configurable by product tier (free, standard, premium)
+
+3. **`cors-policy.xml`**: Cross-origin request handling
+   - Allows localhost:3000 for local development
+   - Placeholder comments for production domains
+   - Supports credentials and common HTTP methods
+
+4. **`complete-policy-example.xml`**: Combined production policy
+   - CORS + authentication + rate limiting
+   - Response caching for GET requests
+   - Security headers (X-Content-Type-Options, X-Frame-Options)
+   - User-friendly error messages
+
+### Quick Setup
+
+**1. Create APIM instance** (one-time setup):
+```bash
+# Create APIM instance (takes ~30-45 minutes)
+az apim create \
+  --name adl-invoice-apim \
+  --resource-group rg-adl-m365 \
+  --publisher-email admin@yourcompany.com \
+  --publisher-name "Your Company" \
+  --sku-name Developer  # or Basic, Standard, Premium for production
+
+# Note the gateway URL: https://adl-invoice-apim.azure-api.net
+```
+
+**2. Import FastAPI as an API**:
+```bash
+# Option A: Import from OpenAPI spec (recommended)
+az apim api import \
+  --resource-group rg-adl-m365 \
+  --service-name adl-invoice-apim \
+  --path invoices \
+  --specification-url https://your-api.azurewebsites.net/openapi.json \
+  --specification-format OpenApi \
+  --api-id invoice-api
+
+# Option B: Manually configure in Azure Portal
+# Go to APIM → APIs → Add API → HTTP → Configure endpoints
+```
+
+**3. Apply policies**:
+```bash
+# Apply at API level (all operations)
+az apim api policy create \
+  --resource-group rg-adl-m365 \
+  --service-name adl-invoice-apim \
+  --api-id invoice-api \
+  --xml-value @infra/apim-policies/complete-policy-example.xml
+
+# Or apply in Azure Portal: APIM → APIs → Invoice API → All operations → Policies
+```
+
+**4. Create products and subscriptions**:
+```bash
+# Create product (e.g., "Invoice Processing - Standard")
+az apim product create \
+  --resource-group rg-adl-m365 \
+  --service-name adl-invoice-apim \
+  --product-id invoice-standard \
+  --product-name "Invoice Processing - Standard" \
+  --description "Standard tier with 10K calls/week" \
+  --subscription-required true \
+  --approval-required false \
+  --state published
+
+# Add API to product
+az apim product api add \
+  --resource-group rg-adl-m365 \
+  --service-name adl-invoice-apim \
+  --product-id invoice-standard \
+  --api-id invoice-api
+
+# Create subscription (generates key automatically)
+az apim subscription create \
+  --resource-group rg-adl-m365 \
+  --service-name adl-invoice-apim \
+  --scope /products/invoice-standard \
+  --name web-ui-subscription
+```
+
+**5. Update clients to use APIM**:
+```bash
+# Web UI: Update .env.local
+NEXT_PUBLIC_API_URL=https://adl-invoice-apim.azure-api.net/invoices
+NEXT_PUBLIC_APIM_SUBSCRIPTION_KEY=your-subscription-key-here
+
+# Logic Apps: Update HTTP action
+# URL: https://adl-invoice-apim.azure-api.net/invoices/extract
+# Headers: {"Ocp-Apim-Subscription-Key": "your-key"}
+
+# Power Automate: Update HTTP action similarly
+```
+
+### Policy Customization
+
+**Adjust rate limits** based on expected load:
+```xml
+<!-- High-volume tier: 1000 calls/minute -->
+<rate-limit calls="1000" renewal-period="60" />
+<quota calls="100000" renewal-period="604800" />
+```
+
+**Add IP whitelisting** for extra security:
+```xml
+<ip-filter action="allow">
+    <address>203.0.113.0/24</address>  <!-- Your corporate network -->
+    <address>198.51.100.50</address>   <!-- Specific server IP -->
+</ip-filter>
+```
+
+**Enable response caching** for read-heavy endpoints:
+```xml
+<cache-lookup vary-by-developer="false" downstream-caching-type="none" />
+<!-- In <outbound> section: -->
+<cache-store duration="300" />  <!-- Cache for 5 minutes -->
+```
+
+### Integration with FastAPI
+
+APIM sits in front of FastAPI, forwarding validated requests:
+
+```
+Client → APIM (validate subscription, apply policies) → FastAPI → Azure DI
+       ↑                                                  ↓
+   Policy checks:                               Business logic:
+   - Subscription key                           - Extract invoice
+   - Rate limit                                 - Validate rules
+   - CORS                                       - Publish events
+```
+
+**Key points:**
+- FastAPI endpoints remain unchanged (no code modifications needed)
+- APIM URL becomes the public-facing endpoint
+- Direct FastAPI URL can be restricted to APIM's IP only (network security)
+- All policy enforcement happens at the gateway layer
+
+### Monitoring & Analytics
+
+**View usage in Azure Portal:**
+- APIM → Analytics → See requests by operation, response time, geography
+- APIM → Subscriptions → See usage per client/team
+- Application Insights integration for detailed telemetry
+
+**Common queries:**
+- Which clients hit rate limits?
+- What's the p95 latency for `/validate`?
+- How many requests failed authentication?
+
 ## Testing (47+ tests, 80%+ coverage)
 
 **Test suite**: `tests/` directory
@@ -480,6 +665,11 @@ docs/                        # Setup guides
 └── POWERSHELL_EXAMPLES.md  # PowerShell scripting examples
 
 infra/                       # Infrastructure definitions
+├── apim-policies/           # Azure API Management policy snippets
+│   ├── subscription-key-policy.xml    # Authentication via subscription keys
+│   ├── rate-limit-policy.xml          # Rate limiting and quotas
+│   ├── cors-policy.xml                # Cross-origin request handling
+│   └── complete-policy-example.xml    # Combined production policy
 ├── bicep/                   # Azure Bicep templates
 ├── logic-app-using-fastapi.json  # Modern Logic App (FastAPI integration)
 └── logic-app-definition.json     # Legacy Logic App (direct Azure DI calls)

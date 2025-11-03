@@ -1,0 +1,37 @@
+<!--
+API Management: Rate Limiting Policy
+
+Protects FastAPI backend from overload by limiting request rates per subscription.
+
+Usage:
+- Apply at Product or API level in APIM
+- Adjust calls and renewal-period based on expected load
+- Consider different limits for different products (free vs premium)
+-->
+<policies>
+    <inbound>
+        <!-- Rate limit: 100 calls per minute per subscription -->
+        <rate-limit calls="100" renewal-period="60" />
+
+        <!-- Alternative: Rate limit by key (e.g., IP address or custom header) -->
+        <!--
+        <rate-limit-by-key calls="100"
+                           renewal-period="60"
+                           counter-key="@(context.Request.IpAddress)" />
+        -->
+
+        <!-- Quota: 10,000 calls per week per subscription -->
+        <quota calls="10000" renewal-period="604800" />
+
+        <base />
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>

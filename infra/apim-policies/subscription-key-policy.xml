@@ -1,0 +1,43 @@
+<!--
+API Management: Subscription Key Validation
+
+Enforces authentication via subscription keys for API access.
+
+Benefits:
+- Prevents unauthorized access
+- Enables per-client rate limiting and quotas
+- Provides usage analytics per subscription
+- Easy key rotation without code changes
+
+Setup:
+1. Create Products in APIM (e.g., "Invoice Processing - Standard")
+2. Add API to Product
+3. Require subscription for Product
+4. Clients use Ocp-Apim-Subscription-Key header
+-->
+<policies>
+    <inbound>
+        <!-- Validate subscription key (automatically enforced if Product requires subscription) -->
+        <check-header name="Ocp-Apim-Subscription-Key" failed-check-httpcode="401" failed-check-error-message="Missing or invalid subscription key">
+            <value>@(context.Request.Headers.GetValueOrDefault("Ocp-Apim-Subscription-Key",""))</value>
+        </check-header>
+
+        <!-- Optional: Add subscription info to backend headers -->
+        <set-header name="X-Subscription-Name" exists-action="override">
+            <value>@(context.Subscription?.Name ?? "anonymous")</value>
+        </set-header>
+
+        <base />
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <!-- Remove internal headers from response -->
+        <set-header name="X-Subscription-Name" exists-action="delete" />
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>

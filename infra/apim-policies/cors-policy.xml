@@ -1,0 +1,63 @@
+<!--
+API Management: CORS Policy
+
+Enables cross-origin requests from web applications.
+Required for browser-based clients to access the API.
+
+Setup:
+1. Update <allowed-origins> with your actual frontend domains
+2. Adjust allowed methods/headers based on your API requirements
+3. Consider different CORS policies for dev vs production
+
+Security Notes:
+- Never use <origin>*</origin> in production (allows any origin)
+- Only whitelist trusted domains
+- Keep allowed-headers minimal to reduce attack surface
+-->
+<policies>
+    <inbound>
+        <cors allow-credentials="true">
+            <allowed-origins>
+                <!-- Local development -->
+                <origin>http://localhost:3000</origin>
+
+                <!-- Azure Web App (if deployed) -->
+                <!-- TODO: Replace with your actual Azure Web App URL after deployment -->
+                <!-- <origin>https://invoice-ui.azurewebsites.net</origin> -->
+
+                <!-- Custom domain (if configured) -->
+                <!-- TODO: Uncomment and replace with your actual production domain -->
+                <!-- <origin>https://invoice.yourdomain.com</origin> -->
+            </allowed-origins>
+
+            <allowed-methods>
+                <method>GET</method>
+                <method>POST</method>
+                <method>PUT</method>
+                <method>DELETE</method>
+                <method>OPTIONS</method>
+            </allowed-methods>
+
+            <allowed-headers>
+                <header>Content-Type</header>
+                <header>Authorization</header>
+                <header>Ocp-Apim-Subscription-Key</header>
+            </allowed-headers>
+
+            <expose-headers>
+                <header>*</header>
+            </expose-headers>
+        </cors>
+
+        <base />
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>
