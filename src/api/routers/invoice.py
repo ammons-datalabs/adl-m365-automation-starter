@@ -41,7 +41,7 @@ async def extract(request: Request, file: UploadFile = File(None)):
 
     This dual-input format allows the endpoint to be called from:
     - Web forms (multipart)
-    - Logic Apps/Power Automate (raw binary)
+    - Logic Apps (raw binary)
     - API clients like curl/Postman
     """
     try:
@@ -77,7 +77,7 @@ async def validate_for_approval(req: ValidateRequest):
     Validate invoice data against approval rules.
 
     This endpoint centralizes business logic for approval decisions,
-    making it reusable from Logic Apps, Power Automate, or other clients.
+    making it reusable from Logic Apps or other clients.
 
     Benefits over embedding rules in Logic Apps:
     - Single source of truth for approval logic
@@ -157,56 +157,6 @@ async def validate_for_approval(req: ValidateRequest):
         logger.error(f"Validation failed: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
-
-@router.post("/process")
-async def process_invoice(file: UploadFile = File(...), confidence_threshold: float = 0.85):
-    """
-    Intelligent invoice processing with automatic approval routing.
-
-    - If confidence >= threshold: Auto-approve and return approval status
-    - If confidence < threshold: Send to Teams for human review
-    """
-    try:
-        # Step 1: Extract invoice data
-        content = await file.read()
-        extracted = extract_invoice_fields(content)
-
-        invoice_data = {
-            "vendor": extracted.vendor,
-            "invoice_number": extracted.invoice_number,
-            "invoice_date": extracted.invoice_date,
-            "total": extracted.total,
-            "currency": extracted.currency,
-            "confidence": extracted.confidence
-        }
-
-        # Step 2: Route based on confidence
-        if extracted.confidence >= confidence_threshold:
-            # High confidence - auto-approve
-            approval_id = approval_tracker.create_approval(invoice_data)
-            approval_tracker.approve(approval_id, approver="system-auto")
-
-            return {
-                "status": "auto_approved",
-                "message": f"Invoice auto-approved (confidence: {extracted.confidence:.2%})",
-                "approval_id": approval_id,
-                "invoice_data": invoice_data
-            }
-        else:
-            # Low confidence - request human approval
-            approval_id = approval_tracker.create_approval(invoice_data)
-            result = await post_approval_card(invoice_data, approval_id)
-
-            return {
-                "status": "pending_approval",
-                "message": f"Sent to Teams for review (confidence: {extracted.confidence:.2%})",
-                "approval_id": approval_id,
-                "invoice_data": invoice_data,
-                "teams_result": result
-            }
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/request-approval")
 async def request_approval(req: ApprovalRequest):

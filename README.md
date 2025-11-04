@@ -9,8 +9,7 @@
 > **Production-Ready AI + Automation across Microsoft 365**
 > Enterprise-grade **intelligent invoice processing system** with **FastAPI**, **Azure Document Intelligence**, **Logic Apps**, and **Teams** — featuring comprehensive test coverage, WCAG AA accessible UI, and intelligent document classification.
 
- **[Watch the 2.5 minute demo →](https://youtu.be/a_5d8T2u-dQ)**
-
+## Introduction
 ---
 
 ## Quickstart
@@ -74,7 +73,7 @@ uvicorn src.api.main:app --host 0.0.0.0 --port 8000
 
 ## Why this repo
 - **Production-ready invoice automation**: Extract → Validate → Route → Approve with intelligent business rules
-- **FastAPI-first architecture**: Reusable API endpoints for Logic Apps, Power Automate, and web UI
+- **FastAPI-first architecture**: Reusable API endpoints for Logic Apps and web UI
 - **Comprehensive testing**: 65+ tests covering extraction, validation, classification, persistence, and event publishing
 - **Intelligent document classification**: Payment obligation detection (invoices vs. receipts) using semantic analysis
 - **Bill-to verification**: Company whitelist validation for fraud prevention
@@ -89,7 +88,7 @@ uvicorn src.api.main:app --host 0.0.0.0 --port 8000
 
 ```mermaid
 flowchart LR
-  A["📄 Invoice Upload<br/>(SharePoint/Web/Power Automate)"] --> B["FastAPI<br/>/extract + /validate"]
+  A["📄 Invoice Upload<br/>(SharePoint/Web UI)"] --> B["FastAPI<br/>/extract + /validate"]
   B --> C["Azure Document<br/>Intelligence"]
   C --> D{"Pass All Checks?<br/>Amount, Confidence<br/>Type, Bill-To"}
   D -->|"✅ Yes"| E["Auto-Approve<br/>SharePoint: Approved<br/>Teams: Notification"]
@@ -97,7 +96,7 @@ flowchart LR
 ```
 
 **Key flow**:
-1. Upload invoice via SharePoint, Web UI, or Power Automate
+1. Upload invoice via SharePoint or Web UI
 2. FastAPI extracts fields and validates against business rules
 3. Azure Document Intelligence performs OCR and field extraction
 4. Decision engine checks: amount, confidence, document type, bill-to company
@@ -203,7 +202,7 @@ See `docs/LOGIC_APPS_SETUP.md` for detailed configuration.
 
 ## FastAPI Endpoints
 
-The system exposes three main endpoints for invoice processing:
+The system exposes two main endpoints for invoice processing:
 
 ### `POST /invoices/extract`
 Extracts invoice fields using Azure Document Intelligence.
@@ -221,14 +220,7 @@ Validates extracted invoice data against business rules.
   - Document type is invoice (payment obligation detected)
   - Document is not a receipt (payment confirmation rejected)
   - Bill-to company is on authorized list
-- **Use case**: Centralized approval logic for Logic Apps, Power Automate, web UI
-
-### `POST /invoices/process`
-End-to-end processing with automatic routing.
-- **Input**: PDF/image file, confidence threshold
-- **Output**: Auto-approved or pending-approval with approval ID
-- **Behavior**: High confidence → auto-approve, low confidence → send to Teams for review
-- **Use case**: Single-call invoice processing
+- **Use case**: Centralized approval logic for Logic Apps and web UI
 
 ## Intelligent Document Classification
 
@@ -278,7 +270,7 @@ Validates that invoices are addressed to authorized companies:
 - Kept for reference and comparison
 
 **Key improvements**:
-- ✅ Reusable validation logic across Logic Apps, Power Automate, web UI
+- ✅ Reusable validation logic across Logic Apps and web UI
 - ✅ Testable business rules (65+ pytest tests)
 - ✅ Detailed check results in Teams notifications
 - ✅ Sequential processing with concurrency control
@@ -321,7 +313,7 @@ Azure API Management (APIM) provides a production-ready gateway layer for the Fa
 ### Why APIM?
 
 **For this invoice automation system:**
-- **Multi-client access control**: Different subscription keys for web UI, Power Automate, Logic Apps
+- **Multi-client access control**: Different subscription keys for web UI and Logic Apps
 - **Rate limiting per client**: Prevent any single integration from overwhelming the backend
 - **CORS management**: Centralized cross-origin policy without touching FastAPI code
 - **Usage analytics**: Track which clients use which endpoints and how often
@@ -438,8 +430,6 @@ NEXT_PUBLIC_APIM_SUBSCRIPTION_KEY=your-subscription-key-here
 # Logic Apps: Update HTTP action
 # URL: https://adl-invoice-apim.azure-api.net/invoices/extract
 # Headers: {"Ocp-Apim-Subscription-Key": "your-key"}
-
-# Power Automate: Update HTTP action similarly
 ```
 
 ### Policy Customization
@@ -541,15 +531,11 @@ Client → APIM (validate subscription, apply policies) → FastAPI → Azure DI
    - Event publishing and consumption
    - Message cleanup and verification
 
-9. **Process endpoint** (`test_process.py`): 3 tests
-   - End-to-end invoice processing
-   - Automatic routing logic
-
-10. **Approval actions** (`test_approve.py`): 2 tests
+9. **Approval actions** (`test_approve.py`): 2 tests
     - Approval decision tracking
     - Action validation
 
-11. **Health checks** (`test_health.py`): 1 test
+10. **Health checks** (`test_health.py`): 1 test
     - API health endpoint validation
 
 ### Running tests
@@ -628,7 +614,6 @@ Add these repository secrets (Settings → Secrets and variables → Actions):
 - **WCAG AA compliance**: Accessible UI for all users including colorblind and screen reader users
 
 ## Citizen-Developer Integration
-- **Power Automate**: Call FastAPI `/extract` and `/validate` endpoints, route to Teams based on response
 - **Logic Apps**: Enterprise-grade with SharePoint connectors and governance
 - **Excel/Power BI**: Query `/approvals/approved` endpoint for reporting and analytics
 - **Teams**: Rich adaptive cards with approval/rejection actions
@@ -640,7 +625,7 @@ src/                          # FastAPI application
 │   ├── main.py              # FastAPI app initialization with CORS
 │   ├── deps.py              # Shared dependencies and models
 │   └── routers/             # API route handlers
-│       ├── invoice.py       # Invoice endpoints: extract, validate, process
+│       ├── invoice.py       # Invoice endpoints: extract, validate
 │       └── health.py        # Health check endpoint
 ├── services/                # Business logic layer
 │   ├── form_recognizer.py  # Azure DI integration
@@ -682,16 +667,13 @@ tests/                       # Pytest test suite (65+ tests)
 ├── test_approval_workflow.py        # 7 tests: Approval flow
 ├── test_extract.py                  # 5 tests: Invoice extraction
 ├── test_service_bus_integration.py  # 3 tests: Real Service Bus (--run-integration)
-├── test_process.py                  # 3 tests: Process endpoint
 ├── test_approve.py                  # 2 tests: Approval actions
 └── test_health.py                   # 1 test: Health endpoint
 
 docs/                        # Setup guides and architecture
 ├── INTEGRATION_DESIGN.md   # System architecture with sequence diagrams
 ├── LOGIC_APPS_SETUP.md     # Logic Apps configuration
-├── SHAREPOINT_SETUP.md     # SharePoint library setup
-├── POWER_AUTOMATE_INTEGRATION.md  # Power Automate workflows
-└── POWERSHELL_EXAMPLES.md  # PowerShell scripting examples
+└── SHAREPOINT_SETUP.md     # SharePoint library setup
 
 infra/                       # Infrastructure definitions
 ├── apim-policies/           # Azure API Management policy snippets
@@ -730,13 +712,6 @@ samples/                     # Sample invoices for testing
 6. SharePoint metadata updated (Status column)
 7. Teams adaptive card sent with approval details or failure reasons
 
-### Scenario C: Power Automate (citizen developer)
-1. Configure flow: SharePoint trigger → HTTP POST to FastAPI
-2. Call `/invoices/extract` with file content
-3. Call `/invoices/validate` with extracted data + company whitelist
-4. Branch on `approved` field from response
-5. Send customized Teams message or email
-6. Update Excel/Dataverse with approval decision
 
 ## What's New (Recent Additions)
 

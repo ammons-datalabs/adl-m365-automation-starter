@@ -1,24 +1,64 @@
 # Logic Apps Setup Guide
 
-This guide explains how to set up the intelligent invoice processing workflow using Azure Logic Apps, Azure Document Intelligence, SharePoint Online, and Microsoft Teams.
+This guide explains how to set up the intelligent invoice processing workflow using Azure Logic Apps with FastAPI integration, Azure Document Intelligence, SharePoint Online, and Microsoft Teams.
+
+## Overview
+
+There are two approaches available for implementing the Logic App workflow:
+
+1. **✅ Recommended: FastAPI Integration** (`logic-app-using-fastapi.json`)
+   - Calls centralized FastAPI endpoints for extraction and validation
+   - Reusable business logic across Logic Apps, web UI, and API clients
+   - Testable validation rules (65+ pytest tests)
+   - Intelligent document classification (invoice vs receipt detection)
+   - Bill-to company verification
+   - Easier to maintain and modify
+
+2. **Alternative: Legacy Direct Integration** (`logic-app-definition.json`)
+   - Direct Azure Document Intelligence API calls
+   - Business logic embedded in Logic App expressions
+   - Kept for reference and backward compatibility
+
+**This guide primarily covers the recommended FastAPI integration approach.**
+
+---
 
 ## Architecture Overview
 
 ![Logic App Flow](LogicAppFlow.png)
 
+### Modern FastAPI Workflow
+
 The workflow automatically:
 1. Monitors a SharePoint library for new invoice PDFs
-2. Extracts invoice data using Azure Document Intelligence
-3. Evaluates approval criteria (amount ≤ $500, confidence > 85%, document type validation)
-4. Routes invoices to "Approved" or "Pending" folders
+2. Calls FastAPI `/invoices/extract` endpoint to extract invoice data
+3. Calls FastAPI `/invoices/validate` endpoint to evaluate approval rules
+4. Routes invoices to "Approved" or "Pending" folders based on validation response
 5. Updates SharePoint metadata
-6. Sends notifications to Microsoft Teams
+6. Sends adaptive cards to Microsoft Teams with detailed results
+
+### Key Benefits
+
+**Centralized Business Logic:**
+- Amount threshold checks (configurable via environment variables)
+- Confidence score validation
+- Intelligent document classification (semantic analysis of payment obligation vs confirmation)
+- Bill-to company whitelist verification
+- Easily testable and modifiable without touching Logic App
+
+**Reusability:**
+- Same validation logic used by Logic Apps, web UI, and API clients
+- Single source of truth for approval rules
+- No duplicate business logic across systems
+
+---
 
 ## Prerequisites
 
 ### Azure Resources
 - **Azure Logic App** (Consumption or Standard tier)
-- **Azure Document Intelligence** resource
+- **Azure Web App** hosting the FastAPI backend (or local endpoint for testing)
+- **Azure Document Intelligence** resource (used by FastAPI backend)
 - **SharePoint Online** site with an "Invoices" document library
 - **Microsoft Teams** channel with incoming webhook configured
 
@@ -26,7 +66,7 @@ The workflow automatically:
 ```
 Invoices/
 ├── Incoming/     # Drop new invoices here
-├── Approved/     # Auto-approved invoices (≤$500, high confidence)
+├── Approved/     # Auto-approved invoices (based on business rules)
 └── Pending/      # Manual review required
 ```
 
@@ -37,31 +77,33 @@ Add these columns to your Invoices library:
 - **InvoiceTotal** (Currency) - optional
 - **InvoiceDate** (Date) - optional
 
+---
+
 ## Configuration
 
-### 1. Azure Document Intelligence
+### 1. FastAPI Backend Deployment
 
-Create a Document Intelligence resource in Azure:
+The FastAPI backend must be deployed and accessible. See the main README for deployment options:
+
+**Option A: Azure Web App (Production)**
 ```bash
-az cognitiveservices account create \
-  --name adl-invoice-extraction \
-  --resource-group rg-adl-m365 \
-  --kind FormRecognizer \
-  --sku S0 \
-  --location westus2
+# FastAPI will be available at:
+https://your-app.azurewebsites.net
 ```
 
-Get the endpoint and key:
+**Option B: Local Development**
 ```bash
-az cognitiveservices account show \
-  --name adl-invoice-extraction \
-  --resource-group rg-adl-m365 \
-  --query properties.endpoint
-
-az cognitiveservices account keys list \
-  --name adl-invoice-extraction \
-  --resource-group rg-adl-m365
+# Run FastAPI locally
+docker run -p 8000:8000 adl-m365-api
+# Available at: http://localhost:8000
 ```
+
+**Required Environment Variables for FastAPI:**
+- `AZ_DI_ENDPOINT` - Azure Document Intelligence endpoint
+- `AZ_DI_API_KEY` - Azure Document Intelligence API key
+- `APPROVAL_AMOUNT_THRESHOLD` - Default: 500.0
+- `APPROVAL_MIN_CONFIDENCE` - Default: 0.85
+- `APPROVAL_ALLOWED_BILL_TO_NAMES` - Comma-separated list of authorized companies
 
 ### 2. Teams Webhook
 
@@ -77,7 +119,9 @@ az cognitiveservices account keys list \
 3. Sign in with your M365 account
 4. Authorize access to your SharePoint site
 
-## Logic App Workflow
+---
+
+## FastAPI Integration Workflow (Recommended)
 
 ### Step-by-Step Flow
 
@@ -86,10 +130,388 @@ az cognitiveservices account keys list \
 - **Library**: Invoices
 - **Folder**: /Invoices/Incoming
 - **Frequency**: Every 1 minute
+- **Concurrency**: 1 (sequential processing to avoid conflicts)
+
+**Configuration:**
+```json
+{
+  "recurrence": {
+    "interval": 1,
+    "frequency": "Minute"
+  },
+  "runtimeConfiguration": {
+    "concurrency": {
+      "runs": 1
+    }
+  }
+}
+```
 
 #### 2. Get file content
 - **Site**: (same as trigger)
 - **File Identifier**: `@triggerBody()?['{Identifier}']`
+
+**Action:** Download PDF from SharePoint
+
+#### 3. HTTP POST: Extract invoice data
+**Call FastAPI `/invoices/extract` endpoint**
+
+```
+URI: @{parameters('FASTAPI_BASE_URL')}/invoices/extract
+Method: POST
+Headers:
+  Content-Type: application/pdf
+Body:
+  @base64ToBinary(body('Get_file_content')?['$content'])
+```
+
+**Response fields:**
+- `vendor` - Vendor name
+- `invoice_number` - Invoice number
+- `invoice_date` - Invoice date
+- `total` - Invoice total amount
+- `currency` - Currency code
+- `confidence` - Extraction confidence score (0-1)
+- `bill_to` - Bill-to company name
+- `content` - Full OCR text content
+
+#### 4. HTTP POST: Validate for approval
+**Call FastAPI `/invoices/validate` endpoint**
+
+```
+URI: @{parameters('FASTAPI_BASE_URL')}/invoices/validate
+Method: POST
+Headers:
+  Content-Type: application/json
+Body:
+{
+  "amount": @{body('Extract_invoice_data')?['total']},
+  "confidence": @{body('Extract_invoice_data')?['confidence']},
+  "content": "@{body('Extract_invoice_data')?['content']}",
+  "vendor": "@{body('Extract_invoice_data')?['vendor']}",
+  "bill_to": "@{body('Extract_invoice_data')?['bill_to']}"
+}
+```
+
+**Response fields:**
+- `approved` - Boolean decision (true/false)
+- `reason` - Human-readable explanation
+- `checks` - Detailed results for each validation check
+  - `amount_within_limit` - Amount ≤ threshold
+  - `confidence_sufficient` - Confidence ≥ minimum
+  - `document_type_is_invoice` - Payment obligation detected
+  - `document_type_not_receipt` - Not a payment confirmation
+  - `bill_to_authorized` - Company on whitelist
+- `metadata` - Additional context about the decision
+
+#### 5. Condition: Check validation result
+
+**Expression:**
+```javascript
+@body('Validate_for_approval')?['approved']
+```
+
+This is much simpler than the legacy approach! The FastAPI backend handles all the complex logic.
+
+### If TRUE (Auto-Approve):
+
+#### 6a. Update file properties
+- **Status**: Approved
+- **Vendor**: `@body('Extract_invoice_data')?['vendor']`
+- **InvoiceTotal**: `@body('Extract_invoice_data')?['total']`
+
+#### 7a. Move file
+- **Source File ID**: `@body('Update_file_properties_approved')?['{Identifier}']`
+- **Destination**: /Invoices/Approved
+
+#### 8a. HTTP POST: Send Teams Adaptive Card (Approved)
+
+```json
+{
+  "type": "message",
+  "attachments": [{
+    "contentType": "application/vnd.microsoft.card.adaptive",
+    "content": {
+      "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+      "type": "AdaptiveCard",
+      "version": "1.4",
+      "body": [
+        {
+          "type": "TextBlock",
+          "text": "✅ Invoice Auto-Approved",
+          "weight": "Bolder",
+          "size": "Large",
+          "color": "Good"
+        },
+        {
+          "type": "FactSet",
+          "facts": [
+            {
+              "title": "Filename:",
+              "value": "@{triggerBody()?['Name']}"
+            },
+            {
+              "title": "Vendor:",
+              "value": "@{body('Extract_invoice_data')?['vendor']}"
+            },
+            {
+              "title": "Invoice #:",
+              "value": "@{body('Extract_invoice_data')?['invoice_number']}"
+            },
+            {
+              "title": "Total:",
+              "value": "@{body('Extract_invoice_data')?['currency']} @{body('Extract_invoice_data')?['total']}"
+            },
+            {
+              "title": "Confidence:",
+              "value": "@{formatNumber(mul(body('Extract_invoice_data')?['confidence'], 100), '0.0')}%"
+            },
+            {
+              "title": "Reason:",
+              "value": "@{body('Validate_for_approval')?['reason']}"
+            }
+          ]
+        }
+      ]
+    }
+  }]
+}
+```
+
+### If FALSE (Pending Review):
+
+#### 6b. Update file properties
+- **Status**: Pending
+- **Vendor**: `@body('Extract_invoice_data')?['vendor']`
+- **InvoiceTotal**: `@body('Extract_invoice_data')?['total']`
+
+#### 7b. Move file
+- **Source File ID**: `@body('Update_file_properties_pending')?['{Identifier}']`
+- **Destination**: /Invoices/Pending
+
+#### 8b. HTTP POST: Send Teams Adaptive Card (Pending)
+
+Include the `checks` object to show which validation rules failed:
+
+```json
+{
+  "type": "FactSet",
+  "facts": [
+    {
+      "title": "✓/✗ Amount within limit:",
+      "value": "@{body('Validate_for_approval')?['checks']?['amount_within_limit']}"
+    },
+    {
+      "title": "✓/✗ Confidence sufficient:",
+      "value": "@{body('Validate_for_approval')?['checks']?['confidence_sufficient']}"
+    },
+    {
+      "title": "✓/✗ Document is invoice:",
+      "value": "@{body('Validate_for_approval')?['checks']?['document_type_is_invoice']}"
+    },
+    {
+      "title": "✓/✗ Not a receipt:",
+      "value": "@{body('Validate_for_approval')?['checks']?['document_type_not_receipt']}"
+    },
+    {
+      "title": "✓/✗ Bill-to authorized:",
+      "value": "@{body('Validate_for_approval')?['checks']?['bill_to_authorized']}"
+    }
+  ]
+}
+```
+
+---
+
+## Deployment
+
+### Option 1: Import from JSON (Fastest)
+
+1. Create a new Logic App in Azure Portal
+2. Go to "Logic app code view"
+3. Paste the contents of `infra/logic-app-using-fastapi.json`
+4. Update the following values:
+   - **YOUR_SHAREPOINT_SITE_URL**: Your SharePoint site (e.g., `https://contoso.sharepoint.com/sites/InvoiceDemo`)
+   - **YOUR_LIBRARY_ID**: SharePoint library GUID (found in library settings URL)
+   - **FASTAPI_BASE_URL**: Your FastAPI endpoint (e.g., `https://your-app.azurewebsites.net`)
+   - **TEAMS_WEBHOOK_URL**: Teams incoming webhook URL
+   - SharePoint connection ID (create connection in Logic App first)
+
+5. Save and enable the Logic App
+
+### Option 2: Manual Designer Setup
+
+Follow the step-by-step flow above in the Logic Apps Designer.
+
+**Key Parameters to Configure:**
+
+Create these parameters in the Logic App:
+- `FASTAPI_BASE_URL` - FastAPI backend URL
+- `TEAMS_WEBHOOK_URL` - Teams webhook URL
+- `$connections` - SharePoint connection reference
+
+---
+
+## Key Expressions Reference
+
+### Access FastAPI extraction response
+```javascript
+// Vendor name
+body('Extract_invoice_data')?['vendor']
+
+// Invoice total
+body('Extract_invoice_data')?['total']
+
+// Currency code
+body('Extract_invoice_data')?['currency']
+
+// Confidence score
+body('Extract_invoice_data')?['confidence']
+
+// Invoice number
+body('Extract_invoice_data')?['invoice_number']
+
+// Invoice date
+body('Extract_invoice_data')?['invoice_date']
+
+// Bill-to company
+body('Extract_invoice_data')?['bill_to']
+
+// Full OCR content
+body('Extract_invoice_data')?['content']
+```
+
+### Access FastAPI validation response
+```javascript
+// Approval decision
+body('Validate_for_approval')?['approved']
+
+// Reason for decision
+body('Validate_for_approval')?['reason']
+
+// Individual check results
+body('Validate_for_approval')?['checks']?['amount_within_limit']
+body('Validate_for_approval')?['checks']?['confidence_sufficient']
+body('Validate_for_approval')?['checks']?['document_type_is_invoice']
+body('Validate_for_approval')?['checks']?['document_type_not_receipt']
+body('Validate_for_approval')?['checks']?['bill_to_authorized']
+```
+
+---
+
+## Testing
+
+### Test FastAPI endpoints
+
+**Test extraction:**
+```bash
+curl -X POST "https://your-app.azurewebsites.net/invoices/extract" \
+  -H "Content-Type: application/pdf" \
+  --data-binary "@sample-invoice.pdf"
+```
+
+**Test validation:**
+```bash
+curl -X POST "https://your-app.azurewebsites.net/invoices/validate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 450.00,
+    "confidence": 0.92,
+    "content": "INVOICE\nVendor: ACME Corp\nTotal: $450.00",
+    "vendor": "ACME Corp",
+    "bill_to": "My Company Pty Ltd"
+  }'
+```
+
+### Test the Teams webhook
+```bash
+curl -X POST "https://yourorg.webhook.office.com/webhookb2/..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Test message: invoice-001.pdf | Total: $450.00"
+  }'
+```
+
+### Upload a test invoice
+1. Create a sample invoice PDF
+2. Upload to SharePoint `/Invoices/Incoming/` folder
+3. Wait 1-2 minutes for the Logic App to trigger
+4. Check:
+   - Logic App run history (should show successful run)
+   - FastAPI logs (extraction and validation calls)
+   - Teams channel for adaptive card notification
+   - Invoice moved to Approved/Pending folder
+   - SharePoint Status column updated
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**FastAPI endpoint returns 404**
+- Verify the FASTAPI_BASE_URL parameter is correct
+- Check that the FastAPI backend is deployed and running
+- Test the endpoint directly with curl
+- Ensure the path includes `/invoices/extract` and `/invoices/validate`
+
+**Validation always returns false**
+- Check FastAPI environment variables (thresholds, allowed companies)
+- Review the `checks` object in the validation response
+- Look at the `reason` field for explanation
+- Test validation endpoint with sample data
+
+**File not found when updating properties**
+- Update properties BEFORE moving the file
+- Use `@triggerBody()?['ID']` for the item ID (not the file path)
+
+**SharePoint connection issues**
+- Re-authorize the SharePoint connection
+- Check that the service principal has access to the site
+- Verify library ID is correct (found in the URL when viewing the library)
+
+**Teams notification not received**
+- Test webhook URL with curl
+- Check that JSON body is properly formatted
+- Verify webhook hasn't been deleted from Teams
+- Check for adaptive card syntax errors
+
+---
+
+## Modifying Business Rules
+
+One of the key benefits of the FastAPI approach is that you can modify business rules **without changing the Logic App**:
+
+### Update approval thresholds
+```bash
+# In Azure Web App Configuration:
+APPROVAL_AMOUNT_THRESHOLD=1000.0  # Increase from $500 to $1000
+APPROVAL_MIN_CONFIDENCE=0.90      # Increase from 85% to 90%
+```
+
+### Add authorized companies
+```bash
+APPROVAL_ALLOWED_BILL_TO_NAMES=My Company Pty Ltd,Acme Corporation,Contoso Inc
+```
+
+### Modify validation logic
+Edit `src/services/approval_rules.py` in the FastAPI codebase and redeploy. The Logic App continues to work without changes.
+
+---
+
+## Alternative: Legacy Direct Integration Approach
+
+For reference, the legacy approach is documented below. **This is not recommended for new implementations.**
+
+<details>
+<summary>Click to expand legacy workflow documentation</summary>
+
+### Legacy Workflow Steps
+
+This approach calls Azure Document Intelligence REST API directly from Logic Apps and implements business logic using Logic App expressions.
+
+#### 1-2. Trigger and Get file content
+(Same as FastAPI approach)
 
 #### 3. HTTP POST: Analyze with Document Intelligence
 ```
@@ -116,12 +538,12 @@ Headers:
 
 #### 6. Compose: Parse results
 ```
-@body('HTTP_3')
+@body('HTTP_GET_Results')
 ```
 
 #### 7. Condition: Evaluate approval criteria
 
-**Expression:**
+**Complex Expression:**
 ```javascript
 @and(
   lessOrEquals(
@@ -143,171 +565,40 @@ Headers:
 )
 ```
 
-**Criteria:**
-- Invoice total ≤ $500
-- Document confidence > 85%
-- Content contains "invoice"
-- Content does NOT contain "receipt"
+**Limitations:**
+- ❌ No bill-to verification
+- ❌ Simple keyword matching (not semantic analysis)
+- ❌ Hard to test and debug
+- ❌ Duplicate logic if used in other systems
+- ❌ Difficult to modify thresholds
 
-### If TRUE (Auto-Approve):
+#### 8-10. Update, Move, Notify
+(Similar to FastAPI approach but with different data sources)
 
-#### 8a. Update file properties
-- **Status**: Approved
-- **Vendor**: `@triggerBody()?['Vendor']`
+### Legacy File Reference
+Use `infra/logic-app-definition.json` for this approach.
 
-#### 9a. Move file
-- **Source File ID**: `@body('Update_file_properties')?['{Identifier}']`
-- **Destination**: /Invoices/Approved
+</details>
 
-#### 10a. HTTP POST: Notify Teams
-```json
-{
-  "text": "Auto-approved: @{triggerBody()?['Name']} | Total: $@{coalesce(outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['InvoiceTotal']?['valueCurrency']?['amount'], 'n/a')}"
-}
-```
-
-### If FALSE (Pending Review):
-
-#### 8b. Update file properties
-- **Status**: Pending
-- **Vendor**: `@triggerBody()?['Vendor']`
-
-#### 9b. Move file
-- **Source File ID**: `@body('Update_file_properties_1')?['{Identifier}']`
-- **Destination**: /Invoices/Pending
-
-#### 10b. HTTP POST: Notify Teams
-```json
-{
-  "text": "Pending approval: @{triggerBody()?['Name']} | Total: $@{coalesce(outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['InvoiceTotal']?['valueCurrency']?['amount'], 'n/a')}"
-}
-```
-
-## Deployment
-
-### Option 1: Import from JSON
-
-1. Create a new Logic App in Azure Portal
-2. Go to "Logic app code view"
-3. Paste the contents of `infra/logic-app-definition.json`
-4. Update the following values:
-   - SharePoint site URL
-   - SharePoint library ID
-   - Document Intelligence endpoint and key
-   - Teams webhook URL
-   - SharePoint connection ID
-
-### Option 2: Manual Designer Setup
-
-Follow the step-by-step flow above in the Logic Apps Designer.
-
-## Key Expressions Reference
-
-### Access extracted invoice fields
-```javascript
-// Invoice total amount
-outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['InvoiceTotal']?['valueCurrency']?['amount']
-
-// Currency code
-outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['InvoiceTotal']?['valueCurrency']?['currencyCode']
-
-// Vendor name
-outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['VendorName']?['valueString']
-
-// Invoice date
-outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['InvoiceDate']?['valueDate']
-
-// Document confidence
-outputs('Compose')?['analyzeResult']?['documents']?[0]?['confidence']
-
-// Line items
-outputs('Compose')?['analyzeResult']?['documents']?[0]?['fields']?['Items']?['valueArray']
-```
-
-### Common Document Intelligence fields
-- `AmountDue` - Total amount due
-- `InvoiceTotal` - Invoice total
-- `SubTotal` - Subtotal before tax
-- `TotalTax` - Total tax amount
-- `VendorName` - Vendor/supplier name
-- `CustomerName` - Customer name
-- `InvoiceId` - Invoice number
-- `InvoiceDate` - Invoice date
-- `Items` - Array of line items
-- `TaxDetails` - Tax breakdown
-
-## Testing
-
-### Test the webhook
-```bash
-curl -X POST "https://metachunklabs.webhook.office.com/webhookb2/..." \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Test message: invoice-001.pdf | Total: $450.00"}'
-```
-
-### Test Document Intelligence endpoint
-```bash
-curl -X POST "https://adl-invoice-extraction.cognitiveservices.azure.com/formrecognizer/documentModels/prebuilt-invoice:analyze?api-version=2023-07-31" \
-  -H "Ocp-Apim-Subscription-Key: {your-key}" \
-  -H "Content-Type: application/pdf" \
-  --data-binary "@sample-invoice.pdf"
-```
-
-### Upload a test invoice
-1. Create a sample invoice PDF with a total < $500
-2. Upload to SharePoint `/Invoices/Incoming/` folder
-3. Wait 1-2 minutes for the Logic App to trigger
-4. Check:
-   - Logic App run history
-   - Teams channel for notification
-   - Invoice moved to Approved/Pending folder
-   - SharePoint Status column updated
-
-## Troubleshooting
-
-### Common Issues
-
-**404 Error on Document Intelligence**
-- Verify endpoint URL format: `https://{name}.cognitiveservices.azure.com`
-- Use stable API version: `2023-07-31` (not preview versions)
-- Check that the API key is correct
-- Path should be `/formrecognizer/documentModels/prebuilt-invoice:analyze`
-
-**File not found when updating properties**
-- Update properties BEFORE moving the file
-- Use `@triggerBody()?['ID']` for the item ID (not the file path)
-
-**Condition always evaluates to false**
-- Check the expression syntax (use `float()` to convert values)
-- Verify field paths in the Document Intelligence response
-- Add `coalesce()` with default values to handle missing fields
-
-**Teams notification not received**
-- Test webhook URL with curl
-- Check that JSON body is properly formatted
-- Verify webhook hasn't been deleted from Teams
-
-**SharePoint connection issues**
-- Re-authorize the SharePoint connection
-- Check that the service principal has access to the site
-- Verify library ID is correct (found in the URL when viewing the library)
+---
 
 ## Security Best Practices
 
 ### Secrets Management
 **Do not commit secrets to the repository!** Use:
-- Azure Key Vault for Document Intelligence keys
+- Azure Key Vault for API keys
 - Logic App managed identity for authentication
-- Environment variables for webhook URLs
+- Parameters for endpoint URLs
 
 ### Sample configuration (for reference only):
 ```bash
 # DO NOT commit actual values
-export DOCUMENT_INTELLIGENCE_ENDPOINT="https://adl-invoice-extraction.cognitiveservices.azure.com/"
-export DOCUMENT_INTELLIGENCE_KEY="your-key-here"
-export TEAMS_WEBHOOK_URL="https://metachunklabs.webhook.office.com/webhookb2/..."
-export SHAREPOINT_SITE_URL="https://metachunklabs.sharepoint.com/sites/ADLInvoiceDemo"
+export FASTAPI_BASE_URL="https://your-app.azurewebsites.net"
+export TEAMS_WEBHOOK_URL="https://yourorg.webhook.office.com/webhookb2/..."
+export SHAREPOINT_SITE_URL="https://yourorg.sharepoint.com/sites/InvoiceDemo"
 ```
+
+---
 
 ## Next Steps
 
@@ -318,9 +609,12 @@ export SHAREPOINT_SITE_URL="https://metachunklabs.sharepoint.com/sites/ADLInvoic
 - [ ] Add exception handling and retry logic
 - [ ] Integrate with ERP system (Dynamics 365, SAP, etc.)
 
+---
+
 ## References
 
-- [Azure Document Intelligence Documentation](https://learn.microsoft.com/azure/ai-services/document-intelligence/)
-- [Logic Apps Workflow Definition Language](https://learn.microsoft.com/azure/logic-apps/logic-apps-workflow-definition-language)
+- [FastAPI Backend Documentation](../README.md)
+- [Azure Logic Apps Documentation](https://learn.microsoft.com/azure/logic-apps/)
 - [SharePoint Online REST API](https://learn.microsoft.com/sharepoint/dev/sp-add-ins/get-to-know-the-sharepoint-rest-service)
 - [Teams Incoming Webhooks](https://learn.microsoft.com/microsoftteams/platform/webhooks-and-connectors/how-to/add-incoming-webhook)
+- [Azure Document Intelligence Documentation](https://learn.microsoft.com/azure/ai-services/document-intelligence/)

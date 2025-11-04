@@ -19,7 +19,6 @@ flowchart TB
     subgraph Clients
         A1[Web UI<br/>Next.js]
         A2[Logic Apps<br/>SharePoint trigger]
-        A3[Power Automate<br/>Custom flows]
     end
 
     subgraph Gateway["API Gateway Layer"]
@@ -29,7 +28,6 @@ flowchart TB
     subgraph Backend["FastAPI Backend"]
         C1["POST /extract"]
         C2["POST /validate"]
-        C3["POST /process"]
         D[Business Logic<br/>approval_rules.py]
     end
 
@@ -53,16 +51,25 @@ flowchart TB
         I3[Audit Logger]
     end
 
-    A1 & A2 & A3 --> B
-    B --> C1 & C2 & C3
-    C1 --> F
+    %% Client to API flows (bidirectional request/response)
+    Clients <-->|1. POST /extract<br/>2. Extraction response| B
+    Clients <-->|3. POST /validate<br/>4. Approval decision| B
+
+    %% API Gateway routing
+    B --> C1 & C2
+
+    %% Extraction flow
+    C1 <-->|Extract fields /<br/>Invoice data| F
+
+    %% Validation flow
     C2 --> D
-    C3 --> C1
-    C3 --> C2
-    D --> E1
-    D --> E2
-    C2 --> G
-    C3 --> H
+    D --> E1 & E2
+    C2 -->|Publish event| G
+
+    %% Client orchestration (one-way)
+    Clients -->|5. Send notification<br/>based on decision| H
+
+    %% Downstream processing (one-way)
     G --> I1 & I2 & I3
 
     style B fill:#0078d4,stroke:#003d6b,stroke-width:3px,color:#fff
@@ -87,7 +94,6 @@ flowchart TB
 **Purpose**: Business logic and orchestration
 - `/extract`: Calls Azure DI, returns structured invoice data
 - `/validate`: Applies business rules, publishes events, tracks approvals
-- `/process`: End-to-end workflow (extract + validate + notify)
 
 **Integration Pattern**: REST API with async orchestration
 
@@ -392,21 +398,6 @@ Client → APIM (policies) → FastAPI Backend
 - A/B testing and canary deployments
 - Centralized monitoring
 
-### 4. Facade Pattern (Simplified Client Interface)
-
-```python
-# Single endpoint for end-to-end processing
-POST /invoices/process
-- Internally calls: extract → validate → notify
-- Simplifies client code
-- Hides orchestration complexity
-```
-
-**Benefits**:
-- Easier for citizen developers (Power Automate)
-- Reduced network roundtrips
-- Consistent error handling
-
 ## Deployment Architecture
 
 ### Local Development
@@ -481,7 +472,7 @@ Azure DI (cloud) + SQLite (local) + Service Bus (optional local emulator)
 ## Security Considerations
 
 ### Authentication & Authorization
-- **APIM**: Subscription keys per client (web UI, Logic Apps, Power Automate)
+- **APIM**: Subscription keys per client (web UI, Logic Apps)
 - **Azure DI**: API key in Key Vault or Web App configuration
 - **Service Bus**: Managed Identity or connection string in Key Vault
 - **Teams**: Webhook URLs treated as secrets
@@ -631,7 +622,7 @@ Upload → Queue → Worker Pool → Process
 This integration design demonstrates a production-ready, event-driven architecture that:
 - Decouples components for independent scaling
 - Uses Azure-native services for reliability
-- Supports multiple client types (web, Logic Apps, Power Automate)
+- Supports multiple client types (web, Logic Apps)
 - Provides observability and monitoring
 - Follows enterprise patterns (repository, gateway, pub/sub)
 - Scales from development to production seamlessly

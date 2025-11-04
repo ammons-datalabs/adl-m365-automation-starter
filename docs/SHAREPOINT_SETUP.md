@@ -1,6 +1,6 @@
-# SharePoint + Power Automate Setup Guide
+# SharePoint + Logic Apps Setup Guide
 
-This guide walks you through setting up the complete invoice automation workflow on SharePoint.
+This guide walks you through setting up the SharePoint library structure for the invoice automation workflow using Azure Logic Apps.
 
 ## Architecture
 
@@ -41,157 +41,29 @@ Add these columns to track invoice metadata:
    - **ApprovalType** (Choice: "AI Auto-Approved", "Human Approved", "Pending")
    - **ApprovalID** (Single line of text)
 
-## Part 2: Power Automate Flow
+## Part 2: Azure Logic Apps Integration
 
-### Create the Flow
+Once your SharePoint library is configured, you can integrate it with Azure Logic Apps for automated invoice processing.
 
-1. Go to https://make.powerautomate.com
-2. Click **"+ Create"** → **"Automated cloud flow"**
-3. Name: `Invoice Processing - Intelligent Routing`
-4. Trigger: Search for **"When a file is created (properties only)"** (SharePoint)
-5. Click **"Create"**
+### Logic Apps Workflow
 
-### Step-by-Step Flow Configuration
+The Logic Apps workflow will:
+1. **Trigger** when a file is created in SharePoint `/Invoices/Incoming/`
+2. **Extract** invoice fields using FastAPI endpoints backed by Azure Document Intelligence
+3. **Validate** against business rules (amount, confidence, document type, bill-to)
+4. **Route** to `/Invoices/Approved/` or `/Invoices/Pending/` based on validation
+5. **Update** SharePoint metadata (Status column)
+6. **Send** Teams adaptive cards with approval details or failure reasons
 
-#### Step 1: Configure Trigger
+### Setup Instructions
 
-**When a file is created (properties only)**
-- **Site Address**: [Select your SharePoint site]
-- **Library Name**: `Invoices`
-- **Folder**: `/Incoming`
-- **Include Nested Folders**: No
+For detailed Logic Apps configuration, see [LOGIC_APPS_SETUP.md](LOGIC_APPS_SETUP.md).
 
-#### Step 2: Get File Content
+You have two Logic App implementation options:
+- **Modern approach**: `infra/logic-app-using-fastapi.json` (calls FastAPI `/extract` and `/validate` endpoints)
+- **Legacy approach**: `infra/logic-app-definition.json` (calls Azure DI REST API directly)
 
-Add action: **Get file content** (SharePoint)
-- **Site Address**: [Same as trigger]
-- **File Identifier**: `ID` (from dynamic content)
-
-#### Step 3: Process Invoice with API
-
-Add action: **HTTP**
-- **Method**: `POST`
-- **URI**:
-  ```
-  https://asp-adl-m365-us-baaydcahbudkeef8.westus3-01.azurewebsites.net/invoices/process?confidence_threshold=0.85
-  ```
-- **Headers**: Leave empty (Power Automate will handle Content-Type)
-- **Body**: Click "Show advanced options"
-  - Select **"Body"** field
-  - Add dynamic content: **File Content** (from "Get file content")
-
-**Advanced Settings:**
-- **Asynchronous Pattern**: On
-- **Timeout**: `PT2M` (2 minutes - Azure DI can be slow)
-
-**Important**: Power Automate will automatically handle the multipart/form-data encoding when you use the File Content directly in the body.
-
-#### Step 4: Parse JSON Response
-
-Add action: **Parse JSON** (Data Operation)
-- **Content**: `Body` (from HTTP action)
-- **Schema**: Click "Use sample payload to generate schema" and paste:
-  ```json
-  {
-    "status": "auto_approved",
-    "message": "Invoice auto-approved (confidence: 100%)",
-    "approval_id": "abc-123",
-    "invoice_data": {
-      "vendor": "CONTOSO LTD.",
-      "invoice_number": "INV-100",
-      "invoice_date": "11/15/2019",
-      "total": 110.0,
-      "currency": "USD",
-      "confidence": 1.0
-    }
-  }
-  ```
-
-#### Step 5: Condition - Check Status
-
-Add action: **Condition** (Control)
-- **Value**: `status` (from Parse JSON)
-- **Operator**: `is equal to`
-- **Value**: `auto_approved`
-
-#### Step 6a: If Auto-Approved (Yes Branch)
-
-**Action 1: Move file to Approved folder**
-- Add action: **Move file** (SharePoint)
-- **Site Address**: [Same as before]
-- **Current File Identifier**: `ID` (from trigger)
-- **Destination Folder Path**: `/Invoices/Approved`
-- **Name if file exists**: `Add number suffix`
-
-**Action 2: Update file properties**
-- Add action: **Update file properties** (SharePoint)
-- **Site Address**: [Same]
-- **Library Name**: `Invoices`
-- **Id**: `ID` (from "Move file" action - use the new ID)
-- **Title**: `invoice_number` (from Parse JSON)
-- Fill in custom columns:
-  - **Vendor**: `vendor`
-  - **InvoiceNumber**: `invoice_number`
-  - **InvoiceDate**: `invoice_date`
-  - **Total**: `total`
-  - **Currency**: `currency`
-  - **Confidence**: `confidence`
-  - **ApprovalType**: `AI Auto-Approved`
-  - **ApprovalID**: `approval_id`
-
-**Action 3: Send Teams notification**
-- Add action: **Post message in a chat or channel** (Teams)
-- **Post as**: `Flow bot`
-- **Post in**: `Channel`
-- **Team**: [Your team]
-- **Channel**: [Your channel]
-- **Message**:
-  ```
-  ✅ Invoice Auto-Approved by AI
-
-  Vendor: @{body('Parse_JSON')?['invoice_data']?['vendor']}
-  Invoice #: @{body('Parse_JSON')?['invoice_data']?['invoice_number']}
-  Total: @{body('Parse_JSON')?['invoice_data']?['currency']} @{body('Parse_JSON')?['invoice_data']?['total']}
-  Confidence: @{mul(body('Parse_JSON')?['invoice_data']?['confidence'], 100)}%
-
-  File: @{triggerOutputs()?['body/{FilenameWithExtension}']}
-  Location: Invoices/Approved
-  ```
-
-#### Step 6b: If Pending Approval (No Branch)
-
-**Action 1: Move file to Pending folder**
-- Add action: **Move file** (SharePoint)
-- **Site Address**: [Same]
-- **Current File Identifier**: `ID` (from trigger)
-- **Destination Folder Path**: `/Invoices/Pending`
-
-**Action 2: Update file properties**
-- Add action: **Update file properties** (SharePoint)
-- [Same as above but **ApprovalType**: `Pending Human Review`]
-
-**Action 3: Send Teams notification**
-- Add action: **Post message in a chat or channel** (Teams)
-- **Message**:
-  ```
-  📧 Invoice Requires Human Review
-
-  Vendor: @{body('Parse_JSON')?['invoice_data']?['vendor']}
-  Invoice #: @{body('Parse_JSON')?['invoice_data']?['invoice_number']}
-  Total: @{body('Parse_JSON')?['invoice_data']?['currency']} @{body('Parse_JSON')?['invoice_data']?['total']}
-  Confidence: @{mul(body('Parse_JSON')?['invoice_data']?['confidence'], 100)}% (below threshold)
-
-  📋 An approval card has been sent to Teams.
-  Check your Teams channel for the approval request.
-  ```
-
-### Step 7: Save and Test
-
-1. Click **"Save"** (top right)
-2. Name your flow if prompted
-3. Click **"Test"** → **"Manually"**
-4. Upload a test PDF to the `Invoices/Incoming` folder
-5. Watch the flow run!
+We recommend the modern approach for better testability and reusable validation logic.
 
 ## Part 3: Testing
 
@@ -205,8 +77,8 @@ Add action: **Condition** (Control)
 2. Upload to `Invoices/Incoming` folder
 
 3. Expected:
-   - Flow triggers
-   - API processes (100% confidence)
+   - Logic App triggers
+   - API processes invoice (100% confidence)
    - File moves to `Approved`
    - Teams notification sent
    - Metadata updated
@@ -220,30 +92,26 @@ For this, you need a lower-quality invoice. You can:
 
 ## Part 4: Monitoring
 
-### View Flow Runs
+### View Logic App Runs
 
-1. Go to https://make.powerautomate.com
-2. Click **"My flows"**
-3. Click your flow
-4. View **"28-day run history"**
-5. Click any run to see detailed logs
+1. Go to Azure Portal
+2. Navigate to your Logic App resource
+3. Click **"Overview"** → **"Runs history"**
+4. Click any run to see detailed execution logs
+5. Review each step's inputs and outputs
 
 ### Common Issues
 
-**Issue: Flow fails at HTTP step**
-- **Solution**: Check API URL is correct and Azure app is running
-- Test URL: `https://asp-adl-m365-us-baaydcahbudkeef8.westus3-01.azurewebsites.net/health`
+**Issue: Logic App fails at HTTP step**
+- **Solution**: Check API URL is correct and Azure Web App is running
+- Test health endpoint: `/health`
 
 **Issue: "File not found" error**
-- **Solution**: Ensure file is fully uploaded before flow triggers
-- Add a 5-second delay after trigger
+- **Solution**: Ensure file is fully uploaded before Logic App triggers
+- Add a 5-second delay after trigger if needed
 
-**Issue: Multipart encoding error**
-- **Solution**: Make sure you're using File Content directly in HTTP body
-- Power Automate handles encoding automatically
-
-**Issue: Timeout after 120 seconds**
-- **Solution**: Azure DI can be slow. Increase timeout or use async pattern
+**Issue: Timeout errors**
+- **Solution**: Azure Document Intelligence can be slow. Increase timeout in HTTP action settings
 
 ## Part 5: Production Considerations
 
@@ -265,15 +133,15 @@ For this, you need a lower-quality invoice. You can:
 ## Next Steps
 
 1. ✅ Set up SharePoint library and folders
-2. ✅ Create Power Automate flow
+2. ✅ Create and deploy Logic App (see [LOGIC_APPS_SETUP.md](LOGIC_APPS_SETUP.md))
 3. ✅ Test with sample invoices
 4. ✅ Configure Teams notifications
 5. ✅ Set up monitoring and alerts
 6. ✅ Train users on the system
 7. ✅ Go live!
 
-## Support
+## Related Documentation
 
-- **API Health**: https://asp-adl-m365-us-baaydcahbudkeef8.westus3-01.azurewebsites.net/health
-- **View Approvals**: https://asp-adl-m365-us-baaydcahbudkeef8.westus3-01.azurewebsites.net/invoices/approvals/approved
-- **Documentation**: Review this repo's README and integration guides
+- **Logic Apps Setup**: [LOGIC_APPS_SETUP.md](LOGIC_APPS_SETUP.md) - Complete Logic App configuration guide
+- **Integration Design**: [../INTEGRATION_DESIGN.md](../INTEGRATION_DESIGN.md) - System architecture and sequence diagrams
+- **Main README**: [../README.md](../README.md) - Project overview and quickstart

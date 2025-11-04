@@ -2,7 +2,7 @@
 Business rules for invoice approval decisions.
 
 Centralizes approval logic that can be tested, versioned, and reused
-across different automation tools (Logic Apps, Power Automate, etc.)
+across different automation tools (Logic Apps, etc.)
 """
 
 from loguru import logger
@@ -151,7 +151,7 @@ class InvoiceApprovalRules:
     - Single source of truth for approval logic
     - Easy to test (unit tests)
     - Easy to modify (change Python code or env vars, not Logic App JSON)
-    - Reusable across Logic Apps, Power Automate, API clients
+    - Reusable across Logic Apps and API clients
     - Can add complex logic (database lookups, ML models, vendor whitelists)
 
     Configuration:

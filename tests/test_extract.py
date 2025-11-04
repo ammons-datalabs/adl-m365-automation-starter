@@ -28,7 +28,7 @@ def test_extract_success_multipart():
         settings.az_di_api_key = original_key
 
 def test_extract_success_raw_binary():
-    """Test /extract with raw binary body (Logic Apps/Power Automate style)"""
+    """Test /extract with raw binary body (Logic Apps style)"""
     # Disable Azure DI for tests - use mock fallback
     original_endpoint = settings.az_di_endpoint
     original_key = settings.az_di_api_key
