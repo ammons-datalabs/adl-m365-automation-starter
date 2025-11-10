@@ -15,67 +15,54 @@ The invoice processing system is a microservices-based solution that combines:
 ## Architecture Diagram
 
 ```mermaid
-flowchart TB
-    subgraph Clients
-        A1[Web UI<br/>Next.js]
-        A2[Logic Apps<br/>SharePoint trigger]
-    end
+flowchart LR
+  subgraph Clients
+    A1[Web UI<br/>Next.js]
+    A2[Logic Apps<br/>SharePoint trigger]
+  end
 
-    subgraph Gateway["API Gateway Layer"]
-        B[Azure API Management<br/>Subscription keys, Rate limiting, CORS]
-    end
+  subgraph Gateway["API Gateway"]
+    B[Azure API Management<br/>Subs keys • Rate limits • CORS]
+  end
 
-    subgraph Backend["FastAPI Backend"]
-        C1["POST /extract"]
-        C2["POST /validate"]
-        D[Business Logic<br/>approval_rules.py]
-    end
+  subgraph Backend["FastAPI"]
+    C1["POST /extract"]
+    C2["POST /validate"]
+    D[Business Logic<br/>approval_rules.py]
+  end
 
-    subgraph Storage["Data Layer"]
-        E1[(SQLite<br/>Approvals DB)]
-        E2[In-Memory<br/>Approval Tracker]
-    end
+  subgraph Storage["Data"]
+    E1[(SQLite<br/>Approvals DB)]
+    E2[In-Memory<br/>Approval Tracker]
+  end
 
-    subgraph Azure["Azure Services"]
-        F[Azure Document<br/>Intelligence]
-        G[Azure Service Bus<br/>Queue: invoice-events]
-    end
+  subgraph Azure["Azure Services"]
+    F[Azure Document<br/>Intelligence]
+    G[Azure Service Bus<br/>Queue: invoice-events]
+  end
 
-    subgraph Notifications
-        H[Microsoft Teams<br/>Adaptive Cards]
-    end
+  subgraph Notifications
+    H[Microsoft Teams<br/>Adaptive Cards]
+  end
 
-    subgraph Downstream["Event Consumers"]
-        I1[ERP Integration]
-        I2[Analytics Pipeline]
-        I3[Audit Logger]
-    end
+  subgraph Downstream["Event Consumers"]
+    I1[ERP Integration]
+    I2[Analytics Pipeline]
+    I3[Audit Logger]
+  end
 
-    %% Client to API flows (bidirectional request/response)
-    Clients <-->|1. POST /extract<br/>2. Extraction response| B
-    Clients <-->|3. POST /validate<br/>4. Approval decision| B
+  %% Flows
+  A1 & A2 -->|/extract & /validate| B --> C1 & C2
+  C1 <-->|Extract fields /<br/>Invoice data| F
+  C2 --> D --> E1 & E2
+  C2 -->|Publish event| G --> I1 & I2 & I3
+  Clients -->|Send notification| H
 
-    %% API Gateway routing
-    B --> C1 & C2
-
-    %% Extraction flow
-    C1 <-->|Extract fields /<br/>Invoice data| F
-
-    %% Validation flow
-    C2 --> D
-    D --> E1 & E2
-    C2 -->|Publish event| G
-
-    %% Client orchestration (one-way)
-    Clients -->|5. Send notification<br/>based on decision| H
-
-    %% Downstream processing (one-way)
-    G --> I1 & I2 & I3
-
-    style B fill:#0078d4,stroke:#003d6b,stroke-width:3px,color:#fff
-    style F fill:#ff8c00,stroke:#cc6f00,stroke-width:3px,color:#000
-    style G fill:#9333ea,stroke:#6b21a8,stroke-width:3px,color:#fff
-    style E1 fill:#2e7d32,stroke:#1b5e20,stroke-width:3px,color:#fff
+  %% Styling
+  style B fill:#0078d4,stroke:#003d6b,stroke-width:3px,color:#fff
+  style F fill:#ff8c00,stroke:#cc6f00,stroke-width:3px,color:#000
+  style G fill:#9333ea,stroke:#6b21a8,stroke-width:3px,color:#fff
+  style E1 fill:#2e7d32,stroke:#1b5e20,stroke-width:3px,color:#fff
 ```
 
 ## Component Responsibilities
