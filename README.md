@@ -51,7 +51,13 @@ docker compose up --build
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
+
+# Modern approach (recommended)
+pip install -e .
+
+# Or legacy approach
 pip install -r requirements.txt
+
 uvicorn src.api.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -540,11 +546,14 @@ Client → APIM (validate subscription, apply policies) → FastAPI → Azure DI
 
 ### Running tests
 ```bash
-# Install dependencies
+# Install dependencies (modern approach)
+pip install -e ".[dev]"
+
+# Or legacy approach
 pip install -r requirements.txt
 
-# Run all tests with coverage
-pytest --cov=src --cov-report=html --cov-report=term
+# Run all tests with coverage (configured in pyproject.toml)
+pytest
 
 # Run specific test file
 pytest tests/test_validate.py -v

@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adl-m365-automation-starter"
+version = "1.0.0"
+description = "Production-ready AI + Automation across Microsoft 365 - Intelligent invoice processing with FastAPI, Azure Document Intelligence, and Teams integration"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Ammons Data Labs"},
+]
+keywords = [
+    "fastapi",
+    "azure",
+    "document-intelligence",
+    "invoice-processing",
+    "automation",
+    "microsoft-365",
+    "teams",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Topic :: Office/Business",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "fastapi>=0.119.0",
+    "uvicorn[standard]>=0.37.0",
+    "pydantic>=2.12.2",
+    "pydantic-settings>=2.11.0",
+    "azure-ai-documentintelligence>=1.0.0",
+    "azure-servicebus>=7.13.0",
+    "loguru>=0.7.3",
+    "python-dotenv>=1.1.1",
+    "python-multipart>=0.0.20",
+    "requests>=2.32.5",
+    "httpx>=0.28.1",
+    "PyYAML>=6.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "coverage>=7.11.0",
+    "respx>=0.22.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ammons-datalabs/adl-m365-automation-starter"
+Repository = "https://github.com/ammons-datalabs/adl-m365-automation-starter"
+Issues = "https://github.com/ammons-datalabs/adl-m365-automation-starter/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--strict-markers",
+    "--cov=src",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "live: marks tests that require live Azure services",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
