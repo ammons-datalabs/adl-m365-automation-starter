@@ -208,7 +208,7 @@
 						"value": "application/json",
 						"type": "text"
 					}
-				},
+				],
 				"body": {
 					"mode": "raw",
 					"raw": "{\n    \"amount\": 450.00,\n    \"confidence\": 0.92,\n    \"content\": \"ACME Corporation\\nInvoice #INV-2025-001\\nDate: October 15, 2025\\nBill To: My Company Pty Ltd\\n\\nDescription: Professional services\\nAmount: $450.00\\n\\nPlease remit payment within 30 days.\",\n    \"vendor\": \"ACME Corporation\",\n    \"bill_to\": \"My Company Pty Ltd\",\n    \"bill_to_authorized\": [\"My Company Pty Ltd\", \"Acme Corporation\"]\n}"
@@ -392,7 +392,7 @@
 						"value": "application/json",
 						"type": "text"
 					}
-				},
+				],
 				"body": {
 					"mode": "raw",
 					"raw": "{\n    \"amount\": 450.00,\n    \"confidence\": 0.92,\n    \"content\": \"ACME Corporation\\nReceipt #RCP-2025-001\\nDate: October 15, 2025\\n\\nPayment Received: $450.00\\nThank you for your payment!\\nCard ending in 4242\\nAuthorization code: 123456\\n\\nBalance: $0.00\",\n    \"vendor\": \"ACME Corporation\",\n    \"bill_to\": \"My Company Pty Ltd\",\n    \"bill_to_authorized\": [\"My Company Pty Ltd\"]\n}"
