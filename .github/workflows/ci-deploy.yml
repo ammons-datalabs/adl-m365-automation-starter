@@ -75,7 +75,16 @@ jobs:
           done
 
       - name: Test Postman collection with Newman
-        run: npm run test:postman:ci
+        run: |
+          # Run only validation tests (skip Extract Invoice which needs real Azure DI)
+          npx newman run tests/postman/postman_collection.json \
+            --env-var "base_url=http://localhost:8000" \
+            --folder "Validate Invoice - Auto Approved" \
+            --folder "Validate Invoice - Amount Exceeds Threshold" \
+            --folder "Validate Invoice - Receipt Detected" \
+            --folder "Validate Invoice - Unauthorized Bill-To" \
+            --reporters cli \
+            --color on
 
       - name: Stop API server
         if: always()
