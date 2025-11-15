@@ -77,9 +77,7 @@ class EventPublisher:
     """
 
     def __init__(
-        self,
-        service_bus_sender: Optional[object] = None,
-        entity_name: str = "invoice-events"
+        self, service_bus_sender: Optional[object] = None, entity_name: str = "invoice-events"
     ):
         """
         Initialize event publisher.

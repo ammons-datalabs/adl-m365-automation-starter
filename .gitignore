@@ -33,3 +33,5 @@ CHANGES_SUMMARY.md
 
 # Logic App definitions with sensitive URLs/webhooks
 infra/logic-app-definition-fastapi.json
+node_modules/
+package-lock.json

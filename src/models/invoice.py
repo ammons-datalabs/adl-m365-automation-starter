@@ -1,5 +1,5 @@
-
 from pydantic import BaseModel, Field
+
 
 class ApprovalRequest(BaseModel):
     vendor: str | None = Field(default=None)

@@ -1,5 +1,5 @@
-
 from pydantic import BaseModel
+
 
 class ExtractResponse(BaseModel):
     vendor: str | None = None

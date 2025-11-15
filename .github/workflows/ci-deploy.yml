@@ -19,16 +19,70 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate JSON and YAML files
+        run: |
+          echo "Validating JSON files..."
+          find . -name "*.json" \
+            -not -path "*/node_modules/*" \
+            -not -path "*/.venv/*" \
+            -not -path "*/dist/*" \
+            -not -path "*/.pytest_cache/*" | while read file; do
+            echo "  ✓ $file"
+            python -m json.tool "$file" > /dev/null || {
+              echo "  ✗ Invalid JSON: $file"
+              exit 1
+            }
+          done
+          echo "All JSON files valid!"
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Tests with coverage
+      - name: Run Python tests with coverage
         run: |
           pytest --maxfail=1 --disable-warnings \
                  --cov=src --cov-report=xml --cov-report=term-missing \
                  --cov-fail-under=78
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Start API server for integration tests
+        run: |
+          # Start API in background with mock credentials
+          export AZ_DI_ENDPOINT="https://mock.cognitiveservices.azure.com/"
+          export AZ_DI_API_KEY="mock-key-for-testing"
+          export TEAMS_WEBHOOK_URL=""
+          uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &
+          API_PID=$!
+          echo "API_PID=$API_PID" >> $GITHUB_ENV
+
+          # Wait for API to be ready (max 30 seconds)
+          echo "Waiting for API to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/health > /dev/null; then
+              echo "API is ready!"
+              break
+            fi
+            echo "  Attempt $i/30..."
+            sleep 1
+          done
+
+      - name: Test Postman collection with Newman
+        run: npm run test:postman:ci
+
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ ! -z "$API_PID" ]; then
+            kill $API_PID || true
+          fi
 
       - name: Azure login (OIDC)
         uses: azure/login@v2

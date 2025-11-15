@@ -1,5 +1,5 @@
-
 from pydantic import BaseModel
+
 
 class ExtractedInvoice(BaseModel):
     vendor: str | None = None

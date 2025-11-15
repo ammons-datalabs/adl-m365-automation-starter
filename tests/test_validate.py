@@ -17,7 +17,7 @@ def test_validate_approved_invoice():
         "confidence": 0.92,
         "content": "INVOICE\nVendor: ACME Corp\nAmount Due: $450.00\nPlease remit payment",
         "vendor": "ACME Corp",
-        "bill_to": None  # Optional field
+        "bill_to": None,  # Optional field
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -39,7 +39,7 @@ def test_validate_rejected_high_amount():
         "amount": 600.00,  # Above $500 threshold
         "confidence": 0.95,
         "content": "INVOICE\nVendor: Big Corp\nTotal: $600.00",
-        "vendor": "Big Corp"
+        "vendor": "Big Corp",
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -57,7 +57,7 @@ def test_validate_rejected_low_confidence():
         "amount": 200.00,
         "confidence": 0.70,  # Below 0.85 threshold
         "content": "INVOICE\nVendor: Some Corp\nTotal: $200.00",
-        "vendor": "Some Corp"
+        "vendor": "Some Corp",
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -75,7 +75,7 @@ def test_validate_rejected_receipt():
         "amount": 100.00,
         "confidence": 0.95,
         "content": "RECEIPT\nAmount Paid: $100.00\nThank you for your payment\nVisa ending 1234",
-        "vendor": "Coffee Shop"
+        "vendor": "Coffee Shop",
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -93,7 +93,7 @@ def test_validate_rejected_no_invoice_indicators():
         "amount": 100.00,
         "confidence": 0.95,
         "content": "Quote\nEstimated Total: $100.00\nValid until: 2025-12-31",  # Quote, not invoice
-        "vendor": "Some Corp"
+        "vendor": "Some Corp",
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -110,7 +110,7 @@ def test_validate_rejected_multiple_failures():
         "amount": 800.00,  # Too high
         "confidence": 0.75,  # Too low
         "content": "RECEIPT\nAmount Paid: $800.00\nPayment received via Mastercard",  # Receipt
-        "vendor": "Big Corp"
+        "vendor": "Big Corp",
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -137,7 +137,7 @@ def test_validate_metadata_included():
         "amount": 300.00,
         "confidence": 0.90,
         "content": "INVOICE\nVendor: Test Corp\nTotal: $300.00",
-        "vendor": "Test Corp"
+        "vendor": "Test Corp",
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -157,7 +157,7 @@ def test_validate_edge_case_exactly_500():
         "amount": 500.00,  # Exactly at threshold
         "confidence": 0.85,  # Exactly at threshold
         "content": "INVOICE\nVendor: Edge Corp\nAmount Due: $500.00\nDue Date: 2025-11-15",
-        "vendor": "Edge Corp"
+        "vendor": "Edge Corp",
     }
 
     response = client.post("/invoices/validate", json=payload)

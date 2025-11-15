@@ -2,6 +2,7 @@
 In-memory approval tracking (for demo purposes).
 In production, use a database (SQL, Cosmos DB, etc.)
 """
+
 from datetime import datetime
 from typing import Dict, Optional
 import uuid
@@ -21,7 +22,7 @@ class ApprovalTracker(ApprovalTrackerBase):
             "status": "pending",
             "created_at": datetime.utcnow().isoformat(),
             "decided_at": None,
-            "decided_by": None
+            "decided_by": None,
         }
         return approval_id
 

@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -10,6 +9,7 @@ from .routers import health, invoice
 logger = setup_logging()
 app = FastAPI(title="ADL M365 Automation Starter")
 
+
 # Add custom exception handler for validation errors
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -19,6 +19,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": exc.errors(), "body": str(await request.body())},
     )
+
 
 # Configure CORS to allow frontend access
 # CORS_ORIGINS can be set in .env as comma-separated list

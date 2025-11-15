@@ -13,15 +13,14 @@ def pytest_addoption(parser):
         "--run-integration",
         action="store_true",
         default=False,
-        help="Run integration tests against real Azure resources"
+        help="Run integration tests against real Azure resources",
     )
 
 
 def pytest_configure(config):
     """Register custom markers"""
     config.addinivalue_line(
-        "markers",
-        "integration: mark test as integration test requiring real Azure resources"
+        "markers", "integration: mark test as integration test requiring real Azure resources"
     )
 
 

@@ -1,0 +1,31 @@
+{
+  "name": "adl-m365-automation-starter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-ready AI + Automation across Microsoft 365 - Intelligent invoice processing with FastAPI and Azure",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ammons-datalabs/adl-m365-automation-starter.git"
+  },
+  "scripts": {
+    "test:postman": "newman run tests/postman/postman_collection.json --env-var base_url=http://localhost:8000 --reporters cli --color on",
+    "test:postman:ci": "newman run tests/postman/postman_collection.json --env-var base_url=http://localhost:8000 --reporters cli --bail --color on"
+  },
+  "keywords": [
+    "fastapi",
+    "azure",
+    "document-intelligence",
+    "invoice-processing",
+    "automation",
+    "microsoft-365"
+  ],
+  "author": "Ammons Data Labs",
+  "license": "MIT",
+  "devDependencies": {
+    "newman": "^6.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

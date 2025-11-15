@@ -26,7 +26,7 @@ def test_approval_workflow_end_to_end():
             "invoice_date": "2025-10-21",
             "total": 250.50,
             "currency": "USD",
-            "confidence": 0.98
+            "confidence": 0.98,
         }
         r = client.post("/invoices/request-approval", json=payload)
         assert r.status_code == 200

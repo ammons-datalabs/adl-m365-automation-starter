@@ -28,6 +28,7 @@ def set_bill_to_whitelist(monkeypatch):
         from importlib import reload
         from src.core import config
         from src.services import approval_rules
+
         reload(config)
         reload(approval_rules)
 
@@ -43,6 +44,7 @@ def set_bill_to_whitelist(monkeypatch):
     from importlib import reload
     from src.core import config
     from src.services import approval_rules
+
     reload(config)
     reload(approval_rules)
 
@@ -56,7 +58,7 @@ def test_no_whitelist_accepts_any_company(set_bill_to_whitelist):
         "confidence": 0.95,
         "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
         "vendor": "ACME Corp",
-        "bill_to": "Random Company Ltd"  # Should be accepted
+        "bill_to": "Random Company Ltd",  # Should be accepted
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -76,7 +78,7 @@ def test_whitelist_rejects_unauthorized_company(set_bill_to_whitelist):
         "confidence": 0.95,
         "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
         "vendor": "ACME Corp",
-        "bill_to": "Different Company Ltd"  # NOT in whitelist
+        "bill_to": "Different Company Ltd",  # NOT in whitelist
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -98,7 +100,7 @@ def test_whitelist_accepts_authorized_company_exact_match(set_bill_to_whitelist)
         "confidence": 0.95,
         "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
         "vendor": "ACME Corp",
-        "bill_to": "My Company Pty Ltd"  # Exact match
+        "bill_to": "My Company Pty Ltd",  # Exact match
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -118,7 +120,7 @@ def test_whitelist_accepts_authorized_company_partial_match(set_bill_to_whitelis
         "confidence": 0.95,
         "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
         "vendor": "ACME Corp",
-        "bill_to": "My Company Pty Ltd Australia"  # Contains "My Company"
+        "bill_to": "My Company Pty Ltd Australia",  # Contains "My Company"
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -140,7 +142,7 @@ def test_whitelist_case_insensitive(set_bill_to_whitelist):
             "confidence": 0.95,
             "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
             "vendor": "ACME Corp",
-            "bill_to": bill_to
+            "bill_to": bill_to,
         }
 
         response = client.post("/invoices/validate", json=payload)
@@ -161,7 +163,7 @@ def test_whitelist_multiple_authorized_companies(set_bill_to_whitelist):
             "confidence": 0.95,
             "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
             "vendor": "ACME Corp",
-            "bill_to": company
+            "bill_to": company,
         }
 
         response = client.post("/invoices/validate", json=payload)
@@ -181,7 +183,7 @@ def test_whitelist_rejects_missing_bill_to(set_bill_to_whitelist):
         "confidence": 0.95,
         "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
         "vendor": "ACME Corp",
-        "bill_to": None  # Missing
+        "bill_to": None,  # Missing
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -203,7 +205,7 @@ def test_whitelist_with_commas_in_company_names(set_bill_to_whitelist):
         "confidence": 0.95,
         "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
         "vendor": "ACME Corp",
-        "bill_to": "Smith, Jones & Associates LLP"
+        "bill_to": "Smith, Jones & Associates LLP",
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -224,7 +226,7 @@ def test_whitelist_prevents_fraud_scenario(set_bill_to_whitelist):
         "confidence": 0.99,
         "content": "INVOICE\nAmount Due: $5000.00\nPlease remit immediately",
         "vendor": "Office Supplies Inc",
-        "bill_to": "Competitor Industries Ltd"  # WRONG COMPANY - fraud attempt
+        "bill_to": "Competitor Industries Ltd",  # WRONG COMPANY - fraud attempt
     }
 
     response = client.post("/invoices/validate", json=payload)
@@ -257,15 +259,16 @@ def test_whitelist_prevents_typosquatting(set_bill_to_whitelist):
             "confidence": 0.95,
             "content": "INVOICE\nAmount Due: $1000.00\nPlease remit payment",
             "vendor": "Supplier Corp",
-            "bill_to": bill_to
+            "bill_to": bill_to,
         }
 
         response = client.post("/invoices/validate", json=payload)
         assert response.status_code == 200
 
         data = response.json()
-        assert data["checks"]["bill_to_authorized"] is should_match, \
-            f"Mismatch for '{bill_to}' ({reason}): expected {should_match}"
+        assert (
+            data["checks"]["bill_to_authorized"] is should_match
+        ), f"Mismatch for '{bill_to}' ({reason}): expected {should_match}"
 
 
 def test_whitelist_with_special_characters(set_bill_to_whitelist):
@@ -285,24 +288,25 @@ def test_whitelist_with_special_characters(set_bill_to_whitelist):
             "confidence": 0.95,
             "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
             "vendor": "Supplier",
-            "bill_to": bill_to
+            "bill_to": bill_to,
         }
 
         response = client.post("/invoices/validate", json=payload)
         assert response.status_code == 200
 
         data = response.json()
-        assert data["checks"]["bill_to_authorized"] is should_approve, \
-            f"Mismatch for {bill_to}: expected {should_approve}, got {data['checks']['bill_to_authorized']}"
+        assert (
+            data["checks"]["bill_to_authorized"] is should_approve
+        ), f"Mismatch for {bill_to}: expected {should_approve}, got {data['checks']['bill_to_authorized']}"
 
 
 def test_whitelist_environmental_config_format(set_bill_to_whitelist):
     """Verify environment variable is parsed correctly with various formats"""
     # Test with extra spaces, mixed case, etc.
     test_configs = [
-        "Company A,Company B,Company C",      # Clean
+        "Company A,Company B,Company C",  # Clean
         " Company A , Company B , Company C ",  # Extra spaces
-        "Company A,  Company B,Company C",    # Inconsistent spacing
+        "Company A,  Company B,Company C",  # Inconsistent spacing
     ]
 
     for config in test_configs:
@@ -313,7 +317,7 @@ def test_whitelist_environmental_config_format(set_bill_to_whitelist):
             "confidence": 0.95,
             "content": "INVOICE\nAmount Due: $100.00\nPlease remit payment",
             "vendor": "Supplier",
-            "bill_to": "Company B Ltd"
+            "bill_to": "Company B Ltd",
         }
 
         response = client.post("/invoices/validate", json=payload)

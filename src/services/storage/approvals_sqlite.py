@@ -39,7 +39,8 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS approvals (
                 id TEXT PRIMARY KEY,
                 invoice_data TEXT NOT NULL,
@@ -49,18 +50,23 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
                 decided_by TEXT,
                 CHECK (status IN ('pending', 'approved', 'rejected'))
             )
-        """)
+        """
+        )
 
         # Create indexes for common queries
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_status
             ON approvals(status)
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_created_at
             ON approvals(created_at)
-        """)
+        """
+        )
 
         conn.commit()
         conn.close()
@@ -87,10 +93,13 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO approvals (id, invoice_data, status, created_at)
             VALUES (?, ?, 'pending', ?)
-        """, (approval_id, json.dumps(invoice_data), created_at))
+        """,
+            (approval_id, json.dumps(invoice_data), created_at),
+        )
 
         conn.commit()
         conn.close()
@@ -110,11 +119,14 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, invoice_data, status, created_at, decided_at, decided_by
             FROM approvals
             WHERE id = ?
-        """, (approval_id,))
+        """,
+            (approval_id,),
+        )
 
         row = cursor.fetchone()
         conn.close()
@@ -128,7 +140,7 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
             "status": row["status"],
             "created_at": row["created_at"],
             "decided_at": row["decided_at"],
-            "decided_by": row["decided_by"]
+            "decided_by": row["decided_by"],
         }
 
     def approve(self, approval_id: str, approver: str = "user") -> bool:
@@ -147,13 +159,16 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
 
         decided_at = datetime.now(UTC).isoformat()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE approvals
             SET status = 'approved',
                 decided_at = ?,
                 decided_by = ?
             WHERE id = ?
-        """, (decided_at, approver, approval_id))
+        """,
+            (decided_at, approver, approval_id),
+        )
 
         rows_affected = cursor.rowcount
         conn.commit()
@@ -177,13 +192,16 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
 
         decided_at = datetime.now(UTC).isoformat()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE approvals
             SET status = 'rejected',
                 decided_at = ?,
                 decided_by = ?
             WHERE id = ?
-        """, (decided_at, rejector, approval_id))
+        """,
+            (decided_at, rejector, approval_id),
+        )
 
         rows_affected = cursor.rowcount
         conn.commit()
@@ -201,11 +219,13 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, invoice_data, status, created_at, decided_at, decided_by
             FROM approvals
             ORDER BY created_at DESC
-        """)
+        """
+        )
 
         rows = cursor.fetchall()
         conn.close()
@@ -217,7 +237,7 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
                 "status": row["status"],
                 "created_at": row["created_at"],
                 "decided_at": row["decided_at"],
-                "decided_by": row["decided_by"]
+                "decided_by": row["decided_by"],
             }
             for row in rows
         ]
@@ -235,12 +255,15 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, invoice_data, status, created_at, decided_at, decided_by
             FROM approvals
             WHERE status = ?
             ORDER BY created_at DESC
-        """, (status,))
+        """,
+            (status,),
+        )
 
         rows = cursor.fetchall()
         conn.close()
@@ -252,7 +275,7 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
                 "status": row["status"],
                 "created_at": row["created_at"],
                 "decided_at": row["decided_at"],
-                "decided_by": row["decided_by"]
+                "decided_by": row["decided_by"],
             }
             for row in rows
         ]
@@ -272,12 +295,14 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, invoice_data, status, created_at, decided_at, decided_by
             FROM approvals
             WHERE status = 'pending'
             ORDER BY created_at DESC
-        """)
+        """
+        )
 
         rows = cursor.fetchall()
         conn.close()
@@ -287,14 +312,16 @@ class SQLiteApprovalTracker(ApprovalTrackerBase):
         for row in rows:
             invoice_data = json.loads(row["invoice_data"])
             if invoice_data.get("total", 0) > amount_threshold:
-                results.append({
-                    "id": row["id"],
-                    "invoice_data": invoice_data,
-                    "status": row["status"],
-                    "created_at": row["created_at"],
-                    "decided_at": row["decided_at"],
-                    "decided_by": row["decided_by"]
-                })
+                results.append(
+                    {
+                        "id": row["id"],
+                        "invoice_data": invoice_data,
+                        "status": row["status"],
+                        "created_at": row["created_at"],
+                        "decided_at": row["decided_at"],
+                        "decided_by": row["decided_by"],
+                    }
+                )
 
         return results
 

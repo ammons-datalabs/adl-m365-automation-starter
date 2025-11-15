@@ -6,12 +6,14 @@ import httpx
 
 client = TestClient(app)
 
+
 def test_approve_skips_without_webhook():
     # Ensure webhook unset
     settings.teams_webhook_url = None
     r = client.post("/invoices/request-approval", json={"vendor": "Contoso"})
     assert r.status_code == 200
     assert r.json()["result"]["status"] == "skipped"
+
 
 @respx.mock
 def test_approve_posts_adaptive_card():
@@ -23,7 +25,7 @@ def test_approve_posts_adaptive_card():
         "invoice_date": "2025-10-12",
         "total": 100.0,
         "currency": "AUD",
-        "confidence": 0.95
+        "confidence": 0.95,
     }
     r = client.post("/invoices/request-approval", json=payload)
     assert r.status_code == 200

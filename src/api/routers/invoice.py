@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -15,6 +14,7 @@ router = APIRouter(prefix="/invoices", tags=["invoices"])
 
 class ValidateRequest(BaseModel):
     """Request body for /invoices/validate endpoint"""
+
     amount: float
     confidence: float
     content: str | None = ""  # Optional OCR content for document classification
@@ -25,10 +25,12 @@ class ValidateRequest(BaseModel):
 
 class ValidateResponse(BaseModel):
     """Response from /invoices/validate endpoint"""
+
     approved: bool
     reason: str
     checks: dict
     metadata: dict
+
 
 @router.post("/extract", response_model=ExtractResponse)
 async def extract(request: Request, file: UploadFile = File(None)):
@@ -52,7 +54,9 @@ async def extract(request: Request, file: UploadFile = File(None)):
             # Raw binary body (e.g., from Logic Apps)
             content = await request.body()
             if not content:
-                raise HTTPException(status_code=422, detail="No file provided (either multipart or raw body)")
+                raise HTTPException(
+                    status_code=422, detail="No file provided (either multipart or raw body)"
+                )
 
         extracted = extract_invoice_fields(content)
         return ExtractResponse(
@@ -109,6 +113,7 @@ async def validate_for_approval(req: ValidateRequest):
     """
     try:
         from loguru import logger
+
         logger.info(
             "Validation request received",
             amount=req.amount,
@@ -116,7 +121,7 @@ async def validate_for_approval(req: ValidateRequest):
             vendor=req.vendor,
             bill_to=req.bill_to,
             bill_to_authorized=req.bill_to_authorized,
-            content_length=len(req.content) if req.content else 0
+            content_length=len(req.content) if req.content else 0,
         )
 
         rules = create_approval_rules(allowed_bill_to_names=req.bill_to_authorized)
@@ -125,7 +130,7 @@ async def validate_for_approval(req: ValidateRequest):
             confidence=req.confidence,
             content=req.content,
             vendor=req.vendor,
-            bill_to=req.bill_to
+            bill_to=req.bill_to,
         )
 
         # Publish InvoiceValidated event to Service Bus
@@ -138,7 +143,7 @@ async def validate_for_approval(req: ValidateRequest):
                 total=req.amount,
                 approved=decision.approved,
                 reason=decision.reason,
-                confidence=req.confidence
+                confidence=req.confidence,
             )
             event_publisher.publish_invoice_validated(event)
             logger.info(f"Published InvoiceValidated event: approved={decision.approved}")
@@ -150,10 +155,11 @@ async def validate_for_approval(req: ValidateRequest):
             approved=decision.approved,
             reason=decision.reason,
             checks=decision.checks,
-            metadata=decision.metadata
+            metadata=decision.metadata,
         )
     except Exception as e:
         from loguru import logger
+
         logger.error(f"Validation failed: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -167,6 +173,7 @@ async def request_approval(req: ApprovalRequest):
     # Post a card to Teams via incoming webhook with approval URLs
     result = await post_approval_card(req.model_dump(), approval_id)
     return {"result": result, "approval_id": approval_id}
+
 
 @router.get("/approval/{approval_id}/approve", response_class=HTMLResponse)
 async def approve_invoice(approval_id: str):
@@ -204,6 +211,7 @@ async def approve_invoice(approval_id: str):
     </html>
     """
 
+
 @router.get("/approval/{approval_id}/reject", response_class=HTMLResponse)
 async def reject_invoice(approval_id: str):
     """Handle rejection action from Teams adaptive card"""
@@ -240,10 +248,12 @@ async def reject_invoice(approval_id: str):
     </html>
     """
 
+
 @router.get("/approvals")
 async def list_approvals():
     """List all approval requests (for debugging)"""
     return {"approvals": approval_tracker.list_all()}
+
 
 @router.get("/approvals/approved")
 async def list_approved_invoices():
@@ -265,24 +275,27 @@ async def list_approved_invoices():
     result = []
     for approval in approved:
         invoice = approval["invoice_data"]
-        result.append({
-            "approval_id": approval["id"],
-            "vendor": invoice.get("vendor", "N/A"),
-            "invoice_number": invoice.get("invoice_number", "N/A"),
-            "invoice_date": invoice.get("invoice_date", "N/A"),
-            "total": invoice.get("total", 0),
-            "currency": invoice.get("currency", "USD"),
-            "confidence": invoice.get("confidence", 0),
-            "approval_type": "AI Auto-Approved" if approval["decided_by"] == "system-auto" else "Human Approved",
-            "approved_by": approval["decided_by"],
-            "approved_at": approval["decided_at"],
-            "created_at": approval["created_at"]
-        })
+        result.append(
+            {
+                "approval_id": approval["id"],
+                "vendor": invoice.get("vendor", "N/A"),
+                "invoice_number": invoice.get("invoice_number", "N/A"),
+                "invoice_date": invoice.get("invoice_date", "N/A"),
+                "total": invoice.get("total", 0),
+                "currency": invoice.get("currency", "USD"),
+                "confidence": invoice.get("confidence", 0),
+                "approval_type": (
+                    "AI Auto-Approved"
+                    if approval["decided_by"] == "system-auto"
+                    else "Human Approved"
+                ),
+                "approved_by": approval["decided_by"],
+                "approved_at": approval["decided_at"],
+                "created_at": approval["created_at"],
+            }
+        )
 
     # Sort by approval time, most recent first
     result.sort(key=lambda x: x["approved_at"], reverse=True)
 
-    return {
-        "total_approved": len(result),
-        "invoices": result
-    }
+    return {"total_approved": len(result), "invoices": result}

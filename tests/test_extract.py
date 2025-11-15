@@ -5,6 +5,7 @@ import io
 
 client = TestClient(app)
 
+
 def test_extract_success_multipart():
     """Test /extract with multipart/form-data (file upload)"""
     # Disable Azure DI for tests - use mock fallback
@@ -20,12 +21,13 @@ def test_extract_success_multipart():
         assert r.status_code == 200
         body = r.json()
         # Contract: keys present
-        for k in ["vendor","invoice_number","invoice_date","total","currency","confidence"]:
+        for k in ["vendor", "invoice_number", "invoice_date", "total", "currency", "confidence"]:
             assert k in body
         assert body["confidence"] >= 0.9
     finally:
         settings.az_di_endpoint = original_endpoint
         settings.az_di_api_key = original_key
+
 
 def test_extract_success_raw_binary():
     """Test /extract with raw binary body (Logic Apps style)"""
@@ -38,19 +40,18 @@ def test_extract_success_raw_binary():
     try:
         pdf_bytes = b"%PDF-1.4 minimal invoice content"
         r = client.post(
-            "/invoices/extract",
-            content=pdf_bytes,
-            headers={"Content-Type": "application/pdf"}
+            "/invoices/extract", content=pdf_bytes, headers={"Content-Type": "application/pdf"}
         )
         assert r.status_code == 200
         body = r.json()
         # Contract: keys present
-        for k in ["vendor","invoice_number","invoice_date","total","currency","confidence"]:
+        for k in ["vendor", "invoice_number", "invoice_date", "total", "currency", "confidence"]:
             assert k in body
         assert body["confidence"] >= 0.9
     finally:
         settings.az_di_endpoint = original_endpoint
         settings.az_di_api_key = original_key
+
 
 def test_extract_success_raw_octet_stream():
     """Test /extract with application/octet-stream content type"""
@@ -65,17 +66,18 @@ def test_extract_success_raw_octet_stream():
         r = client.post(
             "/invoices/extract",
             content=pdf_bytes,
-            headers={"Content-Type": "application/octet-stream"}
+            headers={"Content-Type": "application/octet-stream"},
         )
         assert r.status_code == 200
         body = r.json()
         # Contract: keys present
-        for k in ["vendor","invoice_number","invoice_date","total","currency","confidence"]:
+        for k in ["vendor", "invoice_number", "invoice_date", "total", "currency", "confidence"]:
             assert k in body
         assert body["confidence"] >= 0.9
     finally:
         settings.az_di_endpoint = original_endpoint
         settings.az_di_api_key = original_key
+
 
 def test_extract_zero_length_confidence_is_zero():
     # Disable Azure DI for tests - use mock fallback
@@ -92,6 +94,7 @@ def test_extract_zero_length_confidence_is_zero():
     finally:
         settings.az_di_endpoint = original_endpoint
         settings.az_di_api_key = original_key
+
 
 def test_extract_missing_file_returns_422():
     # 422 Unprocessable Entity

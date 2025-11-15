@@ -50,6 +50,7 @@ docker compose up --build
 ### Option C: Local Python
 
 ```bash
+# Python setup
 python -m venv .venv && source .venv/bin/activate
 
 # Modern approach (recommended)
@@ -58,6 +59,10 @@ pip install -e .
 # Or legacy approach
 pip install -r requirements.txt
 
+# Optional: Install Node.js dependencies for API testing
+npm install  # Installs Newman for Postman collection testing
+
+# Start the API
 uvicorn src.api.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -568,10 +573,29 @@ pytest tests/test_integration_real_invoices.py --run-live
 
 ### Workflow
 1. **Trigger**: Push to `main` branch or manual workflow dispatch
-2. **Install dependencies**: Python 3.11 + pip install from requirements.txt
-3. **Run tests**: pytest with coverage reporting (78%+ required)
-4. **Azure login**: OIDC authentication (no secrets!)
-5. **Deploy**: Azure Web App deployment with startup command
+2. **Validate files**: JSON/YAML syntax validation
+3. **Install dependencies**: Python 3.11 + Node.js 20
+4. **Run Python tests**: pytest with coverage reporting (78%+ required)
+5. **Run API integration tests**: Newman (Postman CLI) against live API
+6. **Azure login**: OIDC authentication (no secrets!)
+7. **Deploy**: Azure Web App deployment with startup command
+
+### Pre-commit Hooks (Optional but Recommended)
+
+Install pre-commit hooks to validate files before committing:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+This will automatically check:
+- JSON/YAML syntax
+- Python code formatting (Black)
+- Trailing whitespace and file endings
+- Accidental private key commits
+
+See `.pre-commit-setup.md` for details.
 
 ### Setup (OIDC - No secrets needed!)
 Configure federated credentials in Azure:
@@ -677,7 +701,9 @@ tests/                       # Pytest test suite (65+ tests)
 ├── test_extract.py                  # 5 tests: Invoice extraction
 ├── test_service_bus_integration.py  # 3 tests: Real Service Bus (--run-integration)
 ├── test_approve.py                  # 2 tests: Approval actions
-└── test_health.py                   # 1 test: Health endpoint
+├── test_health.py                   # 1 test: Health endpoint
+└── postman/                         # API testing with Postman
+    └── postman_collection.json      # Postman collection with automated tests
 
 docs/                        # Setup guides and architecture
 ├── INTEGRATION_DESIGN.md   # System architecture with sequence diagrams
@@ -690,15 +716,21 @@ infra/                       # Infrastructure definitions
 │   ├── rate-limit-policy.xml          # Rate limiting and quotas
 │   ├── cors-policy.xml                # Cross-origin request handling
 │   └── complete-policy-example.xml    # Combined production policy
-├── postman_collection.json  # API testing collection with automated tests
-├── bicep/                   # Azure Bicep templates
-├── logic-app-using-fastapi.json  # Modern Logic App (FastAPI integration)
-└── logic-app-definition.json     # Legacy Logic App (direct Azure DI calls)
+├── logic-app-using-fastapi.json     # Modern Logic App (FastAPI integration)
+├── logic-app-definition-fastapi.json # Alternative Logic App definition
+└── logic-app-definition.json        # Legacy Logic App (direct Azure DI calls)
 
 .github/workflows/           # GitHub Actions CI/CD
 └── ci-deploy.yml           # Test + deploy with OIDC
 
 samples/                     # Sample invoices for testing
+
+# Root configuration files
+├── pyproject.toml           # Python package configuration (PEP 621)
+├── requirements.txt         # Python dependencies (legacy compatibility)
+├── package.json             # Node.js dependencies (Newman for API testing)
+├── .pre-commit-config.yaml  # Pre-commit hooks configuration
+└── .pre-commit-setup.md     # Pre-commit setup guide
 ```
 
 ## Demo script (5 minutes)

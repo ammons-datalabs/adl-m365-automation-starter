@@ -112,7 +112,7 @@ def classify_document_type(text: str) -> Literal["receipt", "invoice", "unknown"
     logger.debug(
         "Document obligation scoring",
         score=score,
-        interpretation="invoice" if score > 2 else "receipt" if score < -2 else "unclear"
+        interpretation="invoice" if score > 2 else "receipt" if score < -2 else "unclear",
     )
 
     # Clear obligation (score > 2) = Invoice
@@ -128,6 +128,7 @@ def classify_document_type(text: str) -> Literal["receipt", "invoice", "unknown"
 
 class ApprovalDecision(BaseModel):
     """Result of an approval decision with explanation"""
+
     approved: bool
     reason: str
     checks: Dict[str, bool]
@@ -136,6 +137,7 @@ class ApprovalDecision(BaseModel):
 
 class ApprovalRulesConfig(BaseModel):
     """Configuration for approval rules (loaded from environment)"""
+
     amount_threshold: float = 500.0
     min_confidence: float = 0.85
     require_invoice_keyword: bool = True
@@ -174,7 +176,7 @@ class InvoiceApprovalRules:
         content: str,
         vendor: str = None,
         bill_to: str = None,
-        **kwargs
+        **kwargs,
     ) -> ApprovalDecision:
         """
         Evaluate whether an invoice should be auto-approved.
@@ -258,13 +260,15 @@ class InvoiceApprovalRules:
         # - PO matching
 
         # Determine final decision
-        all_checks_passed = all([
-            amount_ok,
-            confidence_ok,
-            (is_invoice if self.config.require_invoice_keyword else True),
-            (not is_receipt if self.config.reject_receipt_keyword else True),
-            bill_to_ok
-        ])
+        all_checks_passed = all(
+            [
+                amount_ok,
+                confidence_ok,
+                (is_invoice if self.config.require_invoice_keyword else True),
+                (not is_receipt if self.config.reject_receipt_keyword else True),
+                bill_to_ok,
+            ]
+        )
 
         if all_checks_passed:
             reason = f"Auto-approved: ${amount:.2f}, {confidence:.1%} confidence"
@@ -277,7 +281,7 @@ class InvoiceApprovalRules:
             amount=amount,
             confidence=confidence,
             vendor=vendor,
-            checks=checks
+            checks=checks,
         )
 
         return ApprovalDecision(
@@ -288,8 +292,8 @@ class InvoiceApprovalRules:
                 "amount": amount,
                 "confidence": confidence,
                 "vendor": vendor,
-                "config": self.config.model_dump()
-            }
+                "config": self.config.model_dump(),
+            },
         )
 
 
@@ -298,7 +302,7 @@ def create_approval_rules(
     min_confidence: float = None,
     require_invoice_keyword: bool = None,
     reject_receipt_keyword: bool = None,
-    allowed_bill_to_names: list[str] = None
+    allowed_bill_to_names: list[str] = None,
 ) -> InvoiceApprovalRules:
     """
     Factory function to create approval rules with optional overrides.
@@ -309,18 +313,36 @@ def create_approval_rules(
 
     # Parse comma-separated allowed_bill_to_names from settings if not provided
     if allowed_bill_to_names is None:
-        bill_to_env = getattr(settings, 'approval_allowed_bill_to_names', '')
+        bill_to_env = getattr(settings, "approval_allowed_bill_to_names", "")
         if bill_to_env:
-            allowed_bill_to_names = [name.strip() for name in bill_to_env.split(',') if name.strip()]
+            allowed_bill_to_names = [
+                name.strip() for name in bill_to_env.split(",") if name.strip()
+            ]
         else:
             allowed_bill_to_names = []
 
     config = ApprovalRulesConfig(
-        amount_threshold=amount_threshold if amount_threshold is not None else getattr(settings, 'approval_amount_threshold', 500.0),
-        min_confidence=min_confidence if min_confidence is not None else getattr(settings, 'approval_min_confidence', 0.85),
-        require_invoice_keyword=require_invoice_keyword if require_invoice_keyword is not None else getattr(settings, 'approval_require_invoice_keyword', True),
-        reject_receipt_keyword=reject_receipt_keyword if reject_receipt_keyword is not None else getattr(settings, 'approval_reject_receipt_keyword', True),
-        allowed_bill_to_names=allowed_bill_to_names
+        amount_threshold=(
+            amount_threshold
+            if amount_threshold is not None
+            else getattr(settings, "approval_amount_threshold", 500.0)
+        ),
+        min_confidence=(
+            min_confidence
+            if min_confidence is not None
+            else getattr(settings, "approval_min_confidence", 0.85)
+        ),
+        require_invoice_keyword=(
+            require_invoice_keyword
+            if require_invoice_keyword is not None
+            else getattr(settings, "approval_require_invoice_keyword", True)
+        ),
+        reject_receipt_keyword=(
+            reject_receipt_keyword
+            if reject_receipt_keyword is not None
+            else getattr(settings, "approval_reject_receipt_keyword", True)
+        ),
+        allowed_bill_to_names=allowed_bill_to_names,
     )
 
     return InvoiceApprovalRules(config)

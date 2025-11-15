@@ -1,0 +1,58 @@
+# Pre-commit hooks configuration
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # File format validation
+      - id: check-json
+        name: Validate JSON files
+        description: Check JSON files for syntax errors
+
+      - id: check-yaml
+        name: Validate YAML files
+        description: Check YAML files for syntax errors
+        args: [--unsafe]  # Allow custom YAML tags (for GitHub Actions)
+
+      # File hygiene
+      - id: end-of-file-fixer
+        name: Fix end of files
+        description: Ensure files end with a newline
+
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        description: Remove trailing whitespace
+
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        description: Ensure consistent line endings
+
+      # Security
+      - id: detect-private-key
+        name: Detect private keys
+        description: Prevent committing private keys
+
+      # Python
+      - id: check-ast
+        name: Validate Python syntax
+        description: Check Python files for syntax errors
+
+      - id: check-builtin-literals
+        name: Check builtin literals
+        description: Require literal syntax for initializing empty dicts/lists
+
+      - id: debug-statements
+        name: Check for debugger imports
+        description: Prevent committing Python debug statements
+
+  # Python code formatting (optional but recommended)
+  - repo: https://github.com/psf/black
+    rev: 24.3.0
+    hooks:
+      - id: black
+        name: Format Python code
+        language_version: python3
+        args: [--line-length=100]

@@ -1,4 +1,3 @@
-
 from io import BytesIO
 from loguru import logger
 from azure.ai.documentintelligence import DocumentIntelligenceClient
@@ -12,30 +11,32 @@ def extract_invoice_fields(file_bytes: bytes) -> ExtractedInvoice:
     if settings.az_di_endpoint and settings.az_di_api_key:
         logger.info(
             "Using Azure Document Intelligence for invoice extraction",
-            endpoint=settings.az_di_endpoint[:50] + "..." if len(settings.az_di_endpoint) > 50 else settings.az_di_endpoint
+            endpoint=(
+                settings.az_di_endpoint[:50] + "..."
+                if len(settings.az_di_endpoint) > 50
+                else settings.az_di_endpoint
+            ),
         )
 
         try:
             # Initialize Azure Document Intelligence client
             client = DocumentIntelligenceClient(
                 endpoint=settings.az_di_endpoint,
-                credential=AzureKeyCredential(settings.az_di_api_key)
+                credential=AzureKeyCredential(settings.az_di_api_key),
             )
 
             # Analyze the document using the prebuilt-invoice model
             logger.info(f"Analyzing document of size {len(file_bytes)} bytes")
 
             poller = client.begin_analyze_document(
-                "prebuilt-invoice",
-                body=file_bytes,
-                content_type="application/octet-stream"
+                "prebuilt-invoice", body=file_bytes, content_type="application/octet-stream"
             )
 
             result = poller.result()
 
             # Extract full OCR content for validation
             ocr_content = ""
-            if hasattr(result, 'content') and result.content:
+            if hasattr(result, "content") and result.content:
                 ocr_content = result.content
 
             # Extract invoice fields from the first document
@@ -43,16 +44,16 @@ def extract_invoice_fields(file_bytes: bytes) -> ExtractedInvoice:
                 doc = result.documents[0]
 
                 # Access fields as attributes, not dictionary
-                fields = doc.fields if hasattr(doc, 'fields') else {}
+                fields = doc.fields if hasattr(doc, "fields") else {}
 
                 # Extract specific fields with proper attribute access
                 def get_field_content(field_name):
                     if not fields or field_name not in fields:
                         return None
                     field = fields[field_name]
-                    if hasattr(field, 'content'):
+                    if hasattr(field, "content"):
                         return field.content
-                    elif hasattr(field, 'value'):
+                    elif hasattr(field, "value"):
                         return str(field.value)
                     return None
 
@@ -87,13 +88,13 @@ def extract_invoice_fields(file_bytes: bytes) -> ExtractedInvoice:
                         total_amount = 0.0
 
                 # Calculate average confidence
-                confidence = doc.confidence if hasattr(doc, 'confidence') else 0.0
+                confidence = doc.confidence if hasattr(doc, "confidence") else 0.0
 
                 logger.info(
                     "Successfully extracted invoice data from Azure DI",
                     vendor=vendor_name,
                     invoice_number=invoice_id,
-                    confidence=confidence
+                    confidence=confidence,
                 )
 
                 return ExtractedInvoice(
@@ -105,7 +106,7 @@ def extract_invoice_fields(file_bytes: bytes) -> ExtractedInvoice:
                     confidence=confidence,
                     raw_chars=len(file_bytes),
                     content=ocr_content,
-                    bill_to=bill_to
+                    bill_to=bill_to,
                 )
             else:
                 # No structured invoice data found - likely not an invoice document
@@ -125,7 +126,7 @@ def extract_invoice_fields(file_bytes: bytes) -> ExtractedInvoice:
                     confidence=0.0,  # Low confidence since no structured data found
                     raw_chars=len(file_bytes),
                     content=ocr_content,
-                    bill_to=None
+                    bill_to=None,
                 )
 
         except Exception as e:
@@ -142,11 +143,7 @@ def extract_invoice_fields(file_bytes: bytes) -> ExtractedInvoice:
         text_len = len(file_bytes or b"")
         conf = 0.92 if text_len > 0 else 0.0
 
-        logger.info(
-            "Returning mock invoice extraction",
-            file_size_bytes=text_len,
-            confidence=conf
-        )
+        logger.info("Returning mock invoice extraction", file_size_bytes=text_len, confidence=conf)
 
         return ExtractedInvoice(
             vendor="Contoso Pty Ltd",
@@ -157,5 +154,5 @@ def extract_invoice_fields(file_bytes: bytes) -> ExtractedInvoice:
             confidence=conf,
             raw_chars=text_len,
             content="INVOICE\nContoso Pty Ltd\nInvoice #: INV-10023\nTotal: AUD 385.00\nDue Date: 2025-10-15",
-            bill_to="Ammons DataLabs"
+            bill_to="Ammons DataLabs",
         )

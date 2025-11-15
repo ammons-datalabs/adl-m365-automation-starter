@@ -20,7 +20,7 @@ client = TestClient(app)
 AZURE_DI_CONFIGURED = bool(settings.az_di_endpoint and settings.az_di_api_key)
 skip_if_no_azure_di = pytest.mark.skipif(
     not AZURE_DI_CONFIGURED,
-    reason="Azure Document Intelligence not configured (set AZ_DI_ENDPOINT and AZ_DI_API_KEY)"
+    reason="Azure Document Intelligence not configured (set AZ_DI_ENDPOINT and AZ_DI_API_KEY)",
 )
 
 SAMPLES_DIR = Path(__file__).parent.parent / "samples" / "invoices"
@@ -28,12 +28,15 @@ SAMPLES_DIR = Path(__file__).parent.parent / "samples" / "invoices"
 
 @skip_if_no_azure_di
 @pytest.mark.integration
-@pytest.mark.parametrize("invoice_file", [
-    "invoice-CONTOSO-8890.pdf",
-    "invoice-FOXRIVER-0421.pdf",
-    "simple-invoice-below-500.pdf",
-    "invoice_ctrl_04.pdf",
-])
+@pytest.mark.parametrize(
+    "invoice_file",
+    [
+        "invoice-CONTOSO-8890.pdf",
+        "invoice-FOXRIVER-0421.pdf",
+        "simple-invoice-below-500.pdf",
+        "invoice_ctrl_04.pdf",
+    ],
+)
 def test_extract_real_invoice_clean_scans(invoice_file):
     """Test extraction with clean, well-formatted invoice PDFs"""
     pdf_path = SAMPLES_DIR / invoice_file
@@ -61,7 +64,9 @@ def test_extract_real_invoice_clean_scans(invoice_file):
     assert data["confidence"] > 0.7, f"Low confidence for clean scan: {data['confidence']}"
 
     # Should extract non-empty vendor
-    assert data["vendor"] and data["vendor"] != "Unknown", f"Failed to extract vendor from {invoice_file}"
+    assert (
+        data["vendor"] and data["vendor"] != "Unknown"
+    ), f"Failed to extract vendor from {invoice_file}"
 
     # Should extract a total amount
     assert data["total"] > 0, f"Failed to extract total from {invoice_file}"
@@ -109,13 +114,16 @@ def test_extract_quote_should_be_rejected():
     print(f"  Content extracted: {len(data.get('content', ''))} characters")
 
     # Test validation - quotes should be rejected (lack obligation cues)
-    validate_response = client.post("/invoices/validate", json={
-        "amount": data["total"],
-        "confidence": data["confidence"],
-        "content": data.get("content", ""),
-        "vendor": data["vendor"],
-        "bill_to": data.get("bill_to")
-    })
+    validate_response = client.post(
+        "/invoices/validate",
+        json={
+            "amount": data["total"],
+            "confidence": data["confidence"],
+            "content": data.get("content", ""),
+            "vendor": data["vendor"],
+            "bill_to": data.get("bill_to"),
+        },
+    )
 
     assert validate_response.status_code == 200
     validation = validate_response.json()
@@ -127,7 +135,9 @@ def test_extract_quote_should_be_rejected():
 
     # Quote should be rejected (lacks obligation cues like "amount due", "please remit")
     assert validation["approved"] is False, "Quote should require manual review"
-    assert validation["checks"]["document_type_is_invoice"] is False, "Quote should not be classified as invoice"
+    assert (
+        validation["checks"]["document_type_is_invoice"] is False
+    ), "Quote should not be classified as invoice"
     print(f"  ✅ CORRECTLY REJECTED: Quote lacks invoice obligation cues")
 
 
@@ -157,13 +167,16 @@ def test_extract_receipt_ctrl_03():
     print(f"  Content extracted: {len(data.get('content', ''))} characters")
 
     # Test validation - receipts should be rejected (have confirmation cues)
-    validate_response = client.post("/invoices/validate", json={
-        "amount": data["total"],
-        "confidence": data["confidence"],
-        "content": data.get("content", ""),
-        "vendor": data["vendor"],
-        "bill_to": data.get("bill_to")
-    })
+    validate_response = client.post(
+        "/invoices/validate",
+        json={
+            "amount": data["total"],
+            "confidence": data["confidence"],
+            "content": data.get("content", ""),
+            "vendor": data["vendor"],
+            "bill_to": data.get("bill_to"),
+        },
+    )
 
     assert validate_response.status_code == 200
     validation = validate_response.json()
@@ -175,15 +188,20 @@ def test_extract_receipt_ctrl_03():
 
     # Receipt should be rejected (has confirmation cues like "paid", "balance $0")
     assert validation["approved"] is False, "Receipt should require manual review"
-    assert validation["checks"]["document_type_not_receipt"] is False, "Should be classified as receipt"
+    assert (
+        validation["checks"]["document_type_not_receipt"] is False
+    ), "Should be classified as receipt"
     print(f"  ✅ CORRECTLY REJECTED: Receipt has payment confirmation cues")
 
 
 @skip_if_no_azure_di
 @pytest.mark.integration
-@pytest.mark.parametrize("invoice_file", [
-    "invoice-above-500.pdf",
-])
+@pytest.mark.parametrize(
+    "invoice_file",
+    [
+        "invoice-above-500.pdf",
+    ],
+)
 def test_extract_high_value_invoice(invoice_file):
     """Test extraction of invoices above auto-approval threshold"""
     pdf_path = SAMPLES_DIR / invoice_file
@@ -229,7 +247,7 @@ def test_extract_handwritten_invoice():
     print(f"\n✓ handwritten-Invoice.pdf (handwritten):")
     print(f"  Vendor: {data['vendor']}")
     print(f"  Confidence: {data['confidence']:.1%}")
-    if data['confidence'] < 0.85:
+    if data["confidence"] < 0.85:
         print(f"  ⚠️  Would require manual review (confidence < 85%)")
 
 
@@ -265,13 +283,16 @@ def test_extract_scratched_out_receipt():
     print(f"  Content extracted: {len(data.get('content', ''))} characters")
 
     # Test validation with actual extracted content
-    validate_response = client.post("/invoices/validate", json={
-        "amount": data["total"],
-        "confidence": data["confidence"],
-        "content": data.get("content", ""),
-        "vendor": data["vendor"],
-        "bill_to": data.get("bill_to")
-    })
+    validate_response = client.post(
+        "/invoices/validate",
+        json={
+            "amount": data["total"],
+            "confidence": data["confidence"],
+            "content": data.get("content", ""),
+            "vendor": data["vendor"],
+            "bill_to": data.get("bill_to"),
+        },
+    )
 
     assert validate_response.status_code == 200
     validation = validate_response.json()
@@ -283,7 +304,9 @@ def test_extract_scratched_out_receipt():
 
     # Scratched-out documents may or may not be detected as receipts depending on OCR quality
     # The important thing is the extraction works and validation runs
-    assert validation["approved"] is False, "Scratched/ambiguous document should require manual review"
+    assert (
+        validation["approved"] is False
+    ), "Scratched/ambiguous document should require manual review"
     print(f"  ✅ CORRECTLY REQUIRES REVIEW: Ambiguous/scratched document")
 
 
@@ -324,9 +347,7 @@ def test_extract_raw_binary_with_real_invoice():
         pdf_bytes = f.read()
 
     response = client.post(
-        "/invoices/extract",
-        content=pdf_bytes,
-        headers={"Content-Type": "application/pdf"}
+        "/invoices/extract", content=pdf_bytes, headers={"Content-Type": "application/pdf"}
     )
 
     assert response.status_code == 200
@@ -343,17 +364,17 @@ def test_extract_raw_binary_with_real_invoice():
 def test_summary_message():
     """Display helpful message about running integration tests"""
     if not AZURE_DI_CONFIGURED:
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("⚠️  Azure Document Intelligence Integration Tests Skipped")
-        print("="*70)
+        print("=" * 70)
         print("\nTo run these tests, configure Azure Document Intelligence:")
         print("  1. Create a Document Intelligence resource in Azure")
         print("  2. Add to .env file:")
         print("     AZ_DI_ENDPOINT=https://your-resource.cognitiveservices.azure.com/")
         print("     AZ_DI_API_KEY=your-key-here")
         print("  3. Run: pytest tests/test_integration_real_invoices.py -v")
-        print("\n" + "="*70 + "\n")
+        print("\n" + "=" * 70 + "\n")
     else:
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("✓ Azure Document Intelligence is configured")
-        print("="*70 + "\n")
+        print("=" * 70 + "\n")

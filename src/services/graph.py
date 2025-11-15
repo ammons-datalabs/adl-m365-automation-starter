@@ -1,4 +1,3 @@
-
 import json
 import httpx
 from ..core.config import settings
@@ -8,23 +7,39 @@ from ..core.config import settings
 
 ADAPTIVE_CARD_TEMPLATE = {
     "type": "message",
-    "attachments": [{
-        "contentType": "application/vnd.microsoft.card.adaptive",
-        "content": {
-            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-            "type": "AdaptiveCard",
-            "version": "1.4",
-            "body": [
-                {"type": "TextBlock", "weight": "Bolder", "size": "Medium", "text": "Invoice Approval"},
-                {"type": "FactSet", "facts": []}
-            ],
-            "actions": [
-                {"type": "Action.OpenUrl", "title": "Approve", "url": "https://example.com/approve"},
-                {"type": "Action.OpenUrl", "title": "Reject", "url": "https://example.com/reject"}
-            ]
+    "attachments": [
+        {
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "content": {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type": "AdaptiveCard",
+                "version": "1.4",
+                "body": [
+                    {
+                        "type": "TextBlock",
+                        "weight": "Bolder",
+                        "size": "Medium",
+                        "text": "Invoice Approval",
+                    },
+                    {"type": "FactSet", "facts": []},
+                ],
+                "actions": [
+                    {
+                        "type": "Action.OpenUrl",
+                        "title": "Approve",
+                        "url": "https://example.com/approve",
+                    },
+                    {
+                        "type": "Action.OpenUrl",
+                        "title": "Reject",
+                        "url": "https://example.com/reject",
+                    },
+                ],
+            },
         }
-    }]
+    ],
 }
+
 
 async def post_approval_card(fields: dict, approval_id: str) -> dict:
     if not settings.teams_webhook_url:
@@ -35,7 +50,7 @@ async def post_approval_card(fields: dict, approval_id: str) -> dict:
 
     card = json.loads(json.dumps(ADAPTIVE_CARD_TEMPLATE))
     facts = card["attachments"][0]["content"]["body"][1]["facts"]
-    for k in ["vendor","invoice_number","invoice_date","total","currency","confidence"]:
+    for k in ["vendor", "invoice_number", "invoice_date", "total", "currency", "confidence"]:
         if k in fields and fields[k] is not None:
             facts.append({"title": k, "value": str(fields[k])})
 
@@ -44,13 +59,13 @@ async def post_approval_card(fields: dict, approval_id: str) -> dict:
         {
             "type": "Action.OpenUrl",
             "title": "Approve",
-            "url": f"{base_url}/invoices/approval/{approval_id}/approve"
+            "url": f"{base_url}/invoices/approval/{approval_id}/approve",
         },
         {
             "type": "Action.OpenUrl",
             "title": "Reject",
-            "url": f"{base_url}/invoices/approval/{approval_id}/reject"
-        }
+            "url": f"{base_url}/invoices/approval/{approval_id}/reject",
+        },
     ]
 
     async with httpx.AsyncClient(timeout=10) as client:

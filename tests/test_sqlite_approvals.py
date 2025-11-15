@@ -18,7 +18,7 @@ from src.services.storage.approvals_sqlite import SQLiteApprovalTracker
 @pytest.fixture
 def db_path():
     """Create a temporary database file for testing"""
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     yield path
     # Cleanup
@@ -34,11 +34,7 @@ def tracker(db_path):
 
 def test_create_approval_persists_to_db(tracker, db_path):
     """Test that creating an approval writes to SQLite database"""
-    invoice_data = {
-        "vendor": "ACME Corp",
-        "total": 450.00,
-        "invoice_number": "INV-001"
-    }
+    invoice_data = {"vendor": "ACME Corp", "total": 450.00, "invoice_number": "INV-001"}
 
     approval_id = tracker.create_approval(invoice_data)
 

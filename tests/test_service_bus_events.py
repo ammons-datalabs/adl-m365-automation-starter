@@ -31,7 +31,7 @@ def test_invoice_validated_event_structure():
         total=450.00,
         approved=True,
         reason="Auto-approved: $450.00, 92.0% confidence",
-        confidence=0.92
+        confidence=0.92,
     )
 
     assert event.approval_id == "test-123"
@@ -54,7 +54,7 @@ def test_publish_invoice_validated_event(event_publisher, mock_service_bus_sende
         total=1200.00,
         approved=False,
         reason="Manual review required: amount exceeds threshold",
-        confidence=0.88
+        confidence=0.88,
     )
 
     # Publish the event
@@ -80,7 +80,7 @@ def test_publish_multiple_events(event_publisher, mock_service_bus_sender):
         total=100.00,
         approved=True,
         reason="Approved",
-        confidence=0.95
+        confidence=0.95,
     )
 
     event2 = InvoiceValidatedEvent(
@@ -90,7 +90,7 @@ def test_publish_multiple_events(event_publisher, mock_service_bus_sender):
         total=200.00,
         approved=False,
         reason="Rejected",
-        confidence=0.75
+        confidence=0.75,
     )
 
     event_publisher.publish_invoice_validated(event1)
@@ -110,7 +110,7 @@ def test_publish_with_null_service_bus_sender():
         total=300.00,
         approved=True,
         reason="Test",
-        confidence=0.90
+        confidence=0.90,
     )
 
     # Should not raise an error
@@ -126,7 +126,7 @@ def test_event_serializes_to_json():
         total=999.99,
         approved=True,
         reason="Test serialization",
-        confidence=0.99
+        confidence=0.99,
     )
 
     json_data = event.to_dict()
@@ -149,7 +149,7 @@ def test_event_includes_metadata():
         total=555.55,
         approved=True,
         reason="Metadata test",
-        confidence=0.85
+        confidence=0.85,
     )
 
     data = event.to_dict()
@@ -166,10 +166,7 @@ def test_event_includes_metadata():
 def test_publisher_can_use_entity_name():
     """Test that publisher can be configured with entity name (queue or topic)"""
     mock_sender = Mock()
-    publisher = EventPublisher(
-        service_bus_sender=mock_sender,
-        entity_name="invoice-events"
-    )
+    publisher = EventPublisher(service_bus_sender=mock_sender, entity_name="invoice-events")
 
     assert publisher.entity_name == "invoice-events"
     # Backward compatibility: topic_name should also work
@@ -182,5 +179,5 @@ def test_event_publisher_interface_exists():
     publisher = EventPublisher(service_bus_sender=mock_sender)
 
     # Verify interface methods exist
-    assert hasattr(publisher, 'publish_invoice_validated')
+    assert hasattr(publisher, "publish_invoice_validated")
     assert callable(publisher.publish_invoice_validated)

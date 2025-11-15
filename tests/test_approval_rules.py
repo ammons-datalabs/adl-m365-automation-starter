@@ -149,16 +149,14 @@ class TestBillToAuthorization:
             confidence=0.9,
             content="INVOICE\nAmount Due: $100.00",
             vendor="ACME Corp",
-            bill_to="Random Company"  # Not in whitelist, but no whitelist = pass
+            bill_to="Random Company",  # Not in whitelist, but no whitelist = pass
         )
 
         assert decision.checks["bill_to_authorized"] is True
 
     def test_whitelist_exact_match(self):
         """Exact match with whitelisted company"""
-        config = ApprovalRulesConfig(
-            allowed_bill_to_names=["My Company Pty Ltd", "MyCompany Inc"]
-        )
+        config = ApprovalRulesConfig(allowed_bill_to_names=["My Company Pty Ltd", "MyCompany Inc"])
         rules = InvoiceApprovalRules(config)
 
         decision = rules.evaluate(
@@ -166,16 +164,14 @@ class TestBillToAuthorization:
             confidence=0.9,
             content="INVOICE\nAmount Due: $100.00",
             vendor="ACME Corp",
-            bill_to="My Company Pty Ltd"
+            bill_to="My Company Pty Ltd",
         )
 
         assert decision.checks["bill_to_authorized"] is True
 
     def test_whitelist_partial_match(self):
         """Partial match with whitelisted company (case-insensitive)"""
-        config = ApprovalRulesConfig(
-            allowed_bill_to_names=["My Company"]
-        )
+        config = ApprovalRulesConfig(allowed_bill_to_names=["My Company"])
         rules = InvoiceApprovalRules(config)
 
         # Should match because "My Company" is in "My Company Pty Ltd"
@@ -184,16 +180,14 @@ class TestBillToAuthorization:
             confidence=0.9,
             content="INVOICE\nAmount Due: $100.00",
             vendor="ACME Corp",
-            bill_to="My Company Pty Ltd"
+            bill_to="My Company Pty Ltd",
         )
 
         assert decision.checks["bill_to_authorized"] is True
 
     def test_whitelist_case_insensitive(self):
         """Case-insensitive matching"""
-        config = ApprovalRulesConfig(
-            allowed_bill_to_names=["My Company"]
-        )
+        config = ApprovalRulesConfig(allowed_bill_to_names=["My Company"])
         rules = InvoiceApprovalRules(config)
 
         decision = rules.evaluate(
@@ -201,16 +195,14 @@ class TestBillToAuthorization:
             confidence=0.9,
             content="INVOICE\nAmount Due: $100.00",
             vendor="ACME Corp",
-            bill_to="my company PTY LTD"  # Different case
+            bill_to="my company PTY LTD",  # Different case
         )
 
         assert decision.checks["bill_to_authorized"] is True
 
     def test_whitelist_no_match_fails(self):
         """Invoice to unauthorized company should fail"""
-        config = ApprovalRulesConfig(
-            allowed_bill_to_names=["My Company", "Our Organization"]
-        )
+        config = ApprovalRulesConfig(allowed_bill_to_names=["My Company", "Our Organization"])
         rules = InvoiceApprovalRules(config)
 
         decision = rules.evaluate(
@@ -218,7 +210,7 @@ class TestBillToAuthorization:
             confidence=0.9,
             content="INVOICE\nAmount Due: $100.00",
             vendor="ACME Corp",
-            bill_to="Random Other Company"  # Not in whitelist
+            bill_to="Random Other Company",  # Not in whitelist
         )
 
         assert decision.checks["bill_to_authorized"] is False
@@ -227,9 +219,7 @@ class TestBillToAuthorization:
 
     def test_whitelist_missing_bill_to_fails(self):
         """When whitelist is configured but bill_to is None, should fail"""
-        config = ApprovalRulesConfig(
-            allowed_bill_to_names=["My Company"]
-        )
+        config = ApprovalRulesConfig(allowed_bill_to_names=["My Company"])
         rules = InvoiceApprovalRules(config)
 
         decision = rules.evaluate(
@@ -237,7 +227,7 @@ class TestBillToAuthorization:
             confidence=0.9,
             content="INVOICE\nAmount Due: $100.00",
             vendor="ACME Corp",
-            bill_to=None  # Missing
+            bill_to=None,  # Missing
         )
 
         assert decision.checks["bill_to_authorized"] is False
@@ -246,9 +236,7 @@ class TestBillToAuthorization:
 
     def test_whitelist_multiple_companies(self):
         """Multiple whitelisted companies"""
-        config = ApprovalRulesConfig(
-            allowed_bill_to_names=["Company A", "Company B", "Company C"]
-        )
+        config = ApprovalRulesConfig(allowed_bill_to_names=["Company A", "Company B", "Company C"])
         rules = InvoiceApprovalRules(config)
 
         # Test each company
@@ -258,7 +246,7 @@ class TestBillToAuthorization:
                 confidence=0.9,
                 content="INVOICE\nAmount Due: $100.00",
                 vendor="ACME Corp",
-                bill_to=company
+                bill_to=company,
             )
             assert decision.checks["bill_to_authorized"] is True
 
@@ -269,9 +257,7 @@ class TestApprovalDecisionIntegration:
     def test_all_checks_pass(self):
         """Invoice passing all checks"""
         config = ApprovalRulesConfig(
-            amount_threshold=500.0,
-            min_confidence=0.85,
-            allowed_bill_to_names=["My Company"]
+            amount_threshold=500.0, min_confidence=0.85, allowed_bill_to_names=["My Company"]
         )
         rules = InvoiceApprovalRules(config)
 
@@ -280,7 +266,7 @@ class TestApprovalDecisionIntegration:
             confidence=0.92,
             content="INVOICE\nAmount Due: $450.00\nPlease remit payment",
             vendor="ACME Corp",
-            bill_to="My Company Pty Ltd"
+            bill_to="My Company Pty Ltd",
         )
 
         assert decision.approved is True
@@ -293,9 +279,7 @@ class TestApprovalDecisionIntegration:
     def test_quote_rejected(self):
         """Quote should be rejected (lacks obligation cues)"""
         config = ApprovalRulesConfig(
-            amount_threshold=500.0,
-            min_confidence=0.85,
-            allowed_bill_to_names=["My Company"]
+            amount_threshold=500.0, min_confidence=0.85, allowed_bill_to_names=["My Company"]
         )
         rules = InvoiceApprovalRules(config)
 
@@ -309,7 +293,7 @@ class TestApprovalDecisionIntegration:
             Estimated Total: $5,000.00
             """,
             vendor="ACME Corp",
-            bill_to="My Company"
+            bill_to="My Company",
         )
 
         # Should fail because it's not an invoice (lacks obligation cues)
@@ -319,9 +303,7 @@ class TestApprovalDecisionIntegration:
     def test_receipt_rejected(self):
         """Receipt should be rejected"""
         config = ApprovalRulesConfig(
-            amount_threshold=500.0,
-            min_confidence=0.85,
-            allowed_bill_to_names=["My Company"]
+            amount_threshold=500.0, min_confidence=0.85, allowed_bill_to_names=["My Company"]
         )
         rules = InvoiceApprovalRules(config)
 
@@ -336,7 +318,7 @@ class TestApprovalDecisionIntegration:
             Balance Due: $0.00
             """,
             vendor="Coffee Shop",
-            bill_to="My Company"
+            bill_to="My Company",
         )
 
         assert decision.approved is False
@@ -345,9 +327,7 @@ class TestApprovalDecisionIntegration:
     def test_misdirected_invoice_rejected(self):
         """Invoice addressed to wrong company"""
         config = ApprovalRulesConfig(
-            amount_threshold=500.0,
-            min_confidence=0.85,
-            allowed_bill_to_names=["My Company"]
+            amount_threshold=500.0, min_confidence=0.85, allowed_bill_to_names=["My Company"]
         )
         rules = InvoiceApprovalRules(config)
 
@@ -356,7 +336,7 @@ class TestApprovalDecisionIntegration:
             confidence=0.95,
             content="INVOICE\nAmount Due: $100.00",
             vendor="ACME Corp",
-            bill_to="Different Company"  # Wrong company!
+            bill_to="Different Company",  # Wrong company!
         )
 
         assert decision.approved is False
@@ -366,9 +346,7 @@ class TestApprovalDecisionIntegration:
     def test_multiple_failures_detailed_reason(self):
         """Multiple check failures should have detailed reason"""
         config = ApprovalRulesConfig(
-            amount_threshold=500.0,
-            min_confidence=0.85,
-            allowed_bill_to_names=["My Company"]
+            amount_threshold=500.0, min_confidence=0.85, allowed_bill_to_names=["My Company"]
         )
         rules = InvoiceApprovalRules(config)
 
@@ -377,7 +355,7 @@ class TestApprovalDecisionIntegration:
             confidence=0.7,  # Too low
             content="RECEIPT\nAmount Paid: $1000.00\nThank you for your payment\nVisa ending 1234",  # Receipt with strong confirmation cues
             vendor="ACME Corp",
-            bill_to="Wrong Company"  # Wrong company
+            bill_to="Wrong Company",  # Wrong company
         )
 
         assert decision.approved is False

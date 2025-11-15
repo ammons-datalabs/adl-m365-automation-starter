@@ -93,7 +93,7 @@ def test_publish_to_real_service_bus_queue():
                 total=999.99,
                 approved=True,
                 reason="Integration test event",
-                confidence=0.95
+                confidence=0.95,
             )
 
             # Publish to real Service Bus Queue
@@ -133,7 +133,7 @@ def test_publish_multiple_events_to_queue():
                     total=100.00 * (i + 1),
                     approved=i % 2 == 0,  # Alternate approved/rejected
                     reason=f"Test event {i}",
-                    confidence=0.85 + (i * 0.05)
+                    confidence=0.85 + (i * 0.05),
                 )
                 publisher.publish_invoice_validated(event)
 
