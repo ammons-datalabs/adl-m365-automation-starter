@@ -1,0 +1,132 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      what_if:
+        description: 'Run what-if analysis only (no deployment)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write  # OIDC
+  contents: read
+
+jobs:
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set resource group name
+        id: vars
+        run: |
+          echo "RESOURCE_GROUP=rg-adl-invoice-${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          echo "LOCATION=westus3" >> $GITHUB_OUTPUT
+
+      - name: Create resource group if not exists
+        run: |
+          if ! az group exists --name ${{ steps.vars.outputs.RESOURCE_GROUP }}; then
+            echo "Creating resource group ${{ steps.vars.outputs.RESOURCE_GROUP }}"
+            az group create \
+              --name ${{ steps.vars.outputs.RESOURCE_GROUP }} \
+              --location ${{ steps.vars.outputs.LOCATION }} \
+              --tags Environment=${{ github.event.inputs.environment }} Project="Invoice Processing" ManagedBy="GitHub Actions"
+          else
+            echo "Resource group ${{ steps.vars.outputs.RESOURCE_GROUP }} already exists"
+          fi
+
+      - name: Validate Bicep templates
+        run: |
+          echo "Validating Bicep templates..."
+          az bicep build --file infra/bicep/main.bicep
+          echo "Bicep validation successful"
+
+      - name: What-if analysis
+        if: github.event.inputs.what_if == 'true' || github.event.inputs.environment == 'prod'
+        run: |
+          echo "Running what-if analysis for ${{ github.event.inputs.environment }} environment..."
+          az deployment group what-if \
+            --resource-group ${{ steps.vars.outputs.RESOURCE_GROUP }} \
+            --template-file infra/bicep/main.bicep \
+            --parameters infra/bicep/parameters/${{ github.event.inputs.environment }}.bicepparam \
+            --result-format FullResourcePayloads
+
+      - name: Deploy infrastructure
+        if: github.event.inputs.what_if == 'false'
+        run: |
+          echo "Deploying infrastructure to ${{ github.event.inputs.environment }} environment..."
+          az deployment group create \
+            --resource-group ${{ steps.vars.outputs.RESOURCE_GROUP }} \
+            --template-file infra/bicep/main.bicep \
+            --parameters infra/bicep/parameters/${{ github.event.inputs.environment }}.bicepparam \
+            --name "infra-deployment-$(date +%Y%m%d-%H%M%S)" \
+            --verbose
+
+      - name: Get deployment outputs
+        if: github.event.inputs.what_if == 'false'
+        id: outputs
+        run: |
+          echo "Fetching deployment outputs..."
+          OUTPUTS=$(az deployment group show \
+            --resource-group ${{ steps.vars.outputs.RESOURCE_GROUP }} \
+            --name $(az deployment group list --resource-group ${{ steps.vars.outputs.RESOURCE_GROUP }} --query "[0].name" -o tsv) \
+            --query properties.outputs)
+
+          echo "Deployment outputs:"
+          echo "$OUTPUTS" | jq '.'
+
+          WEB_APP_URL=$(echo "$OUTPUTS" | jq -r '.webAppUrl.value')
+          WEB_APP_NAME=$(echo "$OUTPUTS" | jq -r '.webAppName.value')
+
+          echo "web_app_url=$WEB_APP_URL" >> $GITHUB_OUTPUT
+          echo "web_app_name=$WEB_APP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        if: github.event.inputs.what_if == 'false'
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** ${{ steps.vars.outputs.RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Location:** ${{ steps.vars.outputs.LOCATION }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployed Resources" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web App URL:** [${{ steps.outputs.web_app_url }}](${{ steps.outputs.web_app_url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web App Name:** \`${{ steps.outputs.web_app_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Deploy application code to the Web App" >> $GITHUB_STEP_SUMMARY
+          echo "2. Configure Teams integration if needed" >> $GITHUB_STEP_SUMMARY
+          echo "3. Test the invoice processing system" >> $GITHUB_STEP_SUMMARY
+
+      - name: What-if summary
+        if: github.event.inputs.what_if == 'true'
+        run: |
+          echo "## What-If Analysis Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** ${{ steps.vars.outputs.RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review the what-if analysis output above to see what changes would be made." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To deploy these changes, run the workflow again with 'Run what-if analysis only' unchecked." >> $GITHUB_STEP_SUMMARY

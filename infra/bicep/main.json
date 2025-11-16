@@ -1,0 +1,821 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.38.33.27573",
+      "templateHash": "15714524657402437020"
+    }
+  },
+  "parameters": {
+    "environment": {
+      "type": "string",
+      "allowedValues": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment name (dev, staging, prod)"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for resources"
+      }
+    },
+    "baseName": {
+      "type": "string",
+      "defaultValue": "adl-invoice",
+      "metadata": {
+        "description": "Base name for resources"
+      }
+    },
+    "appServicePlanSku": {
+      "type": "string",
+      "allowedValues": [
+        "B1",
+        "P1V2",
+        "P2V2"
+      ],
+      "metadata": {
+        "description": "App Service Plan SKU"
+      }
+    },
+    "documentIntelligenceSku": {
+      "type": "string",
+      "defaultValue": "S0",
+      "allowedValues": [
+        "F0",
+        "S0"
+      ],
+      "metadata": {
+        "description": "Document Intelligence SKU"
+      }
+    },
+    "serviceBusSku": {
+      "type": "string",
+      "defaultValue": "Standard",
+      "allowedValues": [
+        "Basic",
+        "Standard",
+        "Premium"
+      ],
+      "metadata": {
+        "description": "Service Bus SKU"
+      }
+    },
+    "teamsIntegrationType": {
+      "type": "string",
+      "defaultValue": "none",
+      "allowedValues": [
+        "none",
+        "webhook",
+        "workflow",
+        "graph"
+      ],
+      "metadata": {
+        "description": "Teams integration type"
+      }
+    },
+    "teamsWebhookUrl": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Teams webhook URL (for webhook type)"
+      }
+    },
+    "teamsWorkflowUrl": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Teams workflow URL (for workflow type - Power Automate)"
+      }
+    },
+    "teamsAppClientId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Teams App client ID (for graph type)"
+      }
+    },
+    "teamsAppClientSecret": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Teams App client secret (for graph type)"
+      }
+    },
+    "teamsChannelId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Teams channel ID (for graph type)"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "Environment": "[parameters('environment')]",
+        "Project": "Invoice Processing",
+        "ManagedBy": "Bicep"
+      },
+      "metadata": {
+        "description": "Tags to apply to all resources"
+      }
+    }
+  },
+  "variables": {
+    "resourceSuffix": "[format('{0}-{1}-{2}', parameters('baseName'), parameters('environment'), parameters('location'))]",
+    "appServicePlanName": "[format('asp-{0}', variables('resourceSuffix'))]",
+    "webAppName": "[format('app-{0}', variables('resourceSuffix'))]",
+    "documentIntelligenceName": "[format('di-{0}', variables('resourceSuffix'))]",
+    "serviceBusNamespaceName": "[format('sb-{0}', variables('resourceSuffix'))]",
+    "logAnalyticsName": "[format('log-{0}', variables('resourceSuffix'))]",
+    "appInsightsName": "[format('appi-{0}', variables('resourceSuffix'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "monitoring-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "logAnalyticsName": {
+            "value": "[variables('logAnalyticsName')]"
+          },
+          "appInsightsName": {
+            "value": "[variables('appInsightsName')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "757325572900927111"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for resources"
+              }
+            },
+            "logAnalyticsName": {
+              "type": "string",
+              "metadata": {
+                "description": "Log Analytics workspace name"
+              }
+            },
+            "appInsightsName": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights name"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Tags to apply to resources"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2022-10-01",
+              "name": "[parameters('logAnalyticsName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": 30,
+                "features": {
+                  "enableLogAccessUsingOnlyResourcePermissions": true
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[parameters('appInsightsName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "web",
+              "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName'))]",
+                "RetentionInDays": 30,
+                "IngestionMode": "LogAnalytics",
+                "publicNetworkAccessForIngestion": "Enabled",
+                "publicNetworkAccessForQuery": "Enabled"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "logAnalyticsWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Log Analytics workspace ID"
+              },
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName'))]"
+            },
+            "appInsightsInstrumentationKey": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights instrumentation key"
+              },
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('appInsightsName')), '2020-02-02').InstrumentationKey]"
+            },
+            "appInsightsConnectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights connection string"
+              },
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('appInsightsName')), '2020-02-02').ConnectionString]"
+            },
+            "appInsightsId": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights resource ID"
+              },
+              "value": "[resourceId('Microsoft.Insights/components', parameters('appInsightsName'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "app-service-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "appServicePlanName": {
+            "value": "[variables('appServicePlanName')]"
+          },
+          "webAppName": {
+            "value": "[variables('webAppName')]"
+          },
+          "appServicePlanSku": {
+            "value": "[parameters('appServicePlanSku')]"
+          },
+          "documentIntelligenceEndpoint": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'document-intelligence-deployment'), '2025-04-01').outputs.endpoint.value]"
+          },
+          "documentIntelligenceKey": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'document-intelligence-deployment'), '2025-04-01').outputs.key.value]"
+          },
+          "serviceBusConnectionString": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus-deployment'), '2025-04-01').outputs.connectionString.value]"
+          },
+          "teamsIntegrationType": {
+            "value": "[parameters('teamsIntegrationType')]"
+          },
+          "teamsWebhookUrl": {
+            "value": "[parameters('teamsWebhookUrl')]"
+          },
+          "teamsWorkflowUrl": {
+            "value": "[parameters('teamsWorkflowUrl')]"
+          },
+          "teamsAppClientId": {
+            "value": "[parameters('teamsAppClientId')]"
+          },
+          "teamsAppClientSecret": {
+            "value": "[parameters('teamsAppClientSecret')]"
+          },
+          "teamsChannelId": {
+            "value": "[parameters('teamsChannelId')]"
+          },
+          "appInsightsConnectionString": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'monitoring-deployment'), '2025-04-01').outputs.appInsightsConnectionString.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "15126819764851413572"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for resources"
+              }
+            },
+            "appServicePlanName": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service Plan name"
+              }
+            },
+            "webAppName": {
+              "type": "string",
+              "metadata": {
+                "description": "Web App name"
+              }
+            },
+            "appServicePlanSku": {
+              "type": "string",
+              "allowedValues": [
+                "B1",
+                "P1V2",
+                "P2V2"
+              ],
+              "metadata": {
+                "description": "App Service Plan SKU"
+              }
+            },
+            "documentIntelligenceEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Document Intelligence endpoint"
+              }
+            },
+            "documentIntelligenceKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Document Intelligence API key"
+              }
+            },
+            "serviceBusConnectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Service Bus connection string"
+              }
+            },
+            "teamsIntegrationType": {
+              "type": "string",
+              "allowedValues": [
+                "none",
+                "webhook",
+                "workflow",
+                "graph"
+              ],
+              "metadata": {
+                "description": "Teams integration type"
+              }
+            },
+            "teamsWebhookUrl": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Teams webhook URL (for webhook type)"
+              }
+            },
+            "teamsWorkflowUrl": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Teams workflow URL (for workflow type)"
+              }
+            },
+            "teamsAppClientId": {
+              "type": "string",
+              "metadata": {
+                "description": "Teams App client ID (for graph type)"
+              }
+            },
+            "teamsAppClientSecret": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Teams App client secret (for graph type)"
+              }
+            },
+            "teamsChannelId": {
+              "type": "string",
+              "metadata": {
+                "description": "Teams channel ID (for graph type)"
+              }
+            },
+            "appInsightsConnectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights connection string"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Tags to apply to resources"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2022-09-01",
+              "name": "[parameters('appServicePlanName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('appServicePlanSku')]"
+              },
+              "kind": "linux",
+              "properties": {
+                "reserved": true
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2022-09-01",
+              "name": "[parameters('webAppName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "app,linux",
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+                "httpsOnly": true,
+                "siteConfig": {
+                  "linuxFxVersion": "PYTHON|3.11",
+                  "alwaysOn": true,
+                  "ftpsState": "Disabled",
+                  "minTlsVersion": "1.2",
+                  "appCommandLine": "python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000",
+                  "appSettings": "[union(createArray(createObject('name', 'AZ_DI_ENDPOINT', 'value', parameters('documentIntelligenceEndpoint')), createObject('name', 'AZ_DI_API_KEY', 'value', parameters('documentIntelligenceKey')), createObject('name', 'SERVICE_BUS_CONNECTION_STRING', 'value', parameters('serviceBusConnectionString')), createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', parameters('appInsightsConnectionString')), createObject('name', 'APPROVAL_AMOUNT_THRESHOLD', 'value', '500.0'), createObject('name', 'APPROVAL_MIN_CONFIDENCE', 'value', '0.85'), createObject('name', 'PYTHONUNBUFFERED', 'value', '1'), createObject('name', 'SCM_DO_BUILD_DURING_DEPLOYMENT', 'value', 'true'), createObject('name', 'TEAMS_INTEGRATION_TYPE', 'value', parameters('teamsIntegrationType'))), if(equals(parameters('teamsIntegrationType'), 'webhook'), createArray(createObject('name', 'TEAMS_WEBHOOK_URL', 'value', parameters('teamsWebhookUrl'))), createArray()), if(equals(parameters('teamsIntegrationType'), 'workflow'), createArray(createObject('name', 'TEAMS_WORKFLOW_URL', 'value', parameters('teamsWorkflowUrl'))), createArray()), if(equals(parameters('teamsIntegrationType'), 'graph'), createArray(createObject('name', 'TEAMS_APP_CLIENT_ID', 'value', parameters('teamsAppClientId')), createObject('name', 'TEAMS_APP_CLIENT_SECRET', 'value', parameters('teamsAppClientSecret')), createObject('name', 'TEAMS_CHANNEL_ID', 'value', parameters('teamsChannelId'))), createArray()))]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "webAppUrl": {
+              "type": "string",
+              "metadata": {
+                "description": "Web App URL"
+              },
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2022-09-01').defaultHostName)]"
+            },
+            "webAppName": {
+              "type": "string",
+              "metadata": {
+                "description": "Web App name"
+              },
+              "value": "[parameters('webAppName')]"
+            },
+            "webAppId": {
+              "type": "string",
+              "metadata": {
+                "description": "Web App resource ID"
+              },
+              "value": "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'document-intelligence-deployment')]",
+        "[resourceId('Microsoft.Resources/deployments', 'monitoring-deployment')]",
+        "[resourceId('Microsoft.Resources/deployments', 'service-bus-deployment')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "document-intelligence-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "documentIntelligenceName": {
+            "value": "[variables('documentIntelligenceName')]"
+          },
+          "sku": {
+            "value": "[parameters('documentIntelligenceSku')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "357055903946282171"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for resources"
+              }
+            },
+            "documentIntelligenceName": {
+              "type": "string",
+              "metadata": {
+                "description": "Document Intelligence resource name"
+              }
+            },
+            "sku": {
+              "type": "string",
+              "allowedValues": [
+                "F0",
+                "S0"
+              ],
+              "metadata": {
+                "description": "Document Intelligence SKU"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Tags to apply to resources"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2023-05-01",
+              "name": "[parameters('documentIntelligenceName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "FormRecognizer",
+              "sku": {
+                "name": "[parameters('sku')]"
+              },
+              "properties": {
+                "customSubDomainName": "[parameters('documentIntelligenceName')]",
+                "publicNetworkAccess": "Enabled",
+                "networkAcls": {
+                  "defaultAction": "Allow"
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "endpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Document Intelligence endpoint"
+              },
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('documentIntelligenceName')), '2023-05-01').endpoint]"
+            },
+            "key": {
+              "type": "string",
+              "metadata": {
+                "description": "Document Intelligence primary key"
+              },
+              "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', parameters('documentIntelligenceName')), '2023-05-01').key1]"
+            },
+            "resourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Document Intelligence resource ID"
+              },
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('documentIntelligenceName'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Document Intelligence name"
+              },
+              "value": "[parameters('documentIntelligenceName')]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "service-bus-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "serviceBusNamespaceName": {
+            "value": "[variables('serviceBusNamespaceName')]"
+          },
+          "sku": {
+            "value": "[parameters('serviceBusSku')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.38.33.27573",
+              "templateHash": "16945501250831863920"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for resources"
+              }
+            },
+            "serviceBusNamespaceName": {
+              "type": "string",
+              "metadata": {
+                "description": "Service Bus namespace name"
+              }
+            },
+            "sku": {
+              "type": "string",
+              "allowedValues": [
+                "Basic",
+                "Standard",
+                "Premium"
+              ],
+              "metadata": {
+                "description": "Service Bus SKU"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Tags to apply to resources"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ServiceBus/namespaces",
+              "apiVersion": "2022-10-01-preview",
+              "name": "[parameters('serviceBusNamespaceName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('sku')]"
+              },
+              "properties": {
+                "minimumTlsVersion": "1.2"
+              }
+            },
+            {
+              "type": "Microsoft.ServiceBus/namespaces/queues",
+              "apiVersion": "2022-10-01-preview",
+              "name": "[format('{0}/{1}', parameters('serviceBusNamespaceName'), 'invoice-events')]",
+              "properties": {
+                "maxSizeInMegabytes": 1024,
+                "maxDeliveryCount": 10,
+                "lockDuration": "PT5M",
+                "defaultMessageTimeToLive": "P14D",
+                "deadLetteringOnMessageExpiration": true,
+                "enablePartitioning": false,
+                "requiresDuplicateDetection": false,
+                "requiresSession": false
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.ServiceBus/namespaces/AuthorizationRules",
+              "apiVersion": "2022-10-01-preview",
+              "name": "[format('{0}/{1}', parameters('serviceBusNamespaceName'), 'SendListenRule')]",
+              "properties": {
+                "rights": [
+                  "Send",
+                  "Listen"
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "namespaceName": {
+              "type": "string",
+              "metadata": {
+                "description": "Service Bus namespace name"
+              },
+              "value": "[parameters('serviceBusNamespaceName')]"
+            },
+            "connectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "Service Bus connection string"
+              },
+              "value": "[listKeys(resourceId('Microsoft.ServiceBus/namespaces/AuthorizationRules', parameters('serviceBusNamespaceName'), 'SendListenRule'), '2022-10-01-preview').primaryConnectionString]"
+            },
+            "queueName": {
+              "type": "string",
+              "metadata": {
+                "description": "Invoice events queue name"
+              },
+              "value": "invoice-events"
+            },
+            "namespaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Service Bus namespace resource ID"
+              },
+              "value": "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "webAppUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Web App URL"
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-service-deployment'), '2025-04-01').outputs.webAppUrl.value]"
+    },
+    "webAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "Web App name for deployment"
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-service-deployment'), '2025-04-01').outputs.webAppName.value]"
+    },
+    "documentIntelligenceEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "Document Intelligence endpoint"
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'document-intelligence-deployment'), '2025-04-01').outputs.endpoint.value]"
+    },
+    "serviceBusNamespace": {
+      "type": "string",
+      "metadata": {
+        "description": "Service Bus namespace"
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus-deployment'), '2025-04-01').outputs.namespaceName.value]"
+    },
+    "appInsightsInstrumentationKey": {
+      "type": "string",
+      "metadata": {
+        "description": "Application Insights instrumentation key"
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'monitoring-deployment'), '2025-04-01').outputs.appInsightsInstrumentationKey.value]"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource group name"
+      },
+      "value": "[resourceGroup().name]"
+    },
+    "environment": {
+      "type": "string",
+      "metadata": {
+        "description": "Environment deployed"
+      },
+      "value": "[parameters('environment')]"
+    }
+  }
+}

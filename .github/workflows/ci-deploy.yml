@@ -106,6 +106,6 @@ jobs:
       - name: Deploy to Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: asp-adl-m365-us
+          app-name: app-adl-invoice-dev-westus3
           package: .
           startup-command: python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000

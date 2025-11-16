@@ -631,9 +631,86 @@ Add these repository secrets (Settings → Secrets and variables → Actions):
 - `AZURE_SUBSCRIPTION_ID`: Subscription ID
 
 **Benefits of OIDC**:
-- ✅ No rotating secrets or passwords
-- ✅ Short-lived tokens only
-- ✅ Azure AD manages authentication
+- No rotating secrets or passwords
+- Short-lived tokens only
+- Azure AD manages authentication
+
+## Infrastructure as Code (Bicep)
+
+**Location**: `infra/bicep/` directory
+
+Complete Bicep templates for automated Azure infrastructure deployment across multiple environments.
+
+### What Gets Deployed
+
+- **App Service**: Linux Web App (Python 3.11) for FastAPI backend
+- **Document Intelligence**: Azure AI for invoice OCR and field extraction
+- **Service Bus**: Event-driven messaging with invoice-events queue
+- **Monitoring**: Application Insights + Log Analytics for observability
+
+### Multi-Environment Support
+
+Infrastructure templates support dev, staging, and production environments with appropriate SKUs:
+
+| Resource                  | Dev (Cost-Optimized)  | Staging/Prod (Performance) |
+|---------------------------|------------------------|---------------------------|
+| App Service Plan          | B1 (Basic)            | P1V2 (Premium)            |
+| Document Intelligence     | F0 (Free)             | S0 (Standard)             |
+| Service Bus               | Basic                 | Standard                  |
+| Location                  | West US 3             | West US 3                 |
+
+### Teams Integration Options
+
+Teams notifications support **multiple methods** (all optional):
+
+1. **None** (default) - No Teams integration
+2. **Webhook** (legacy) - Incoming Webhook (deprecated but works)
+3. **Workflow** (recommended) - Power Automate with HTTP trigger
+4. **Graph API** (advanced) - Microsoft Graph with Teams app
+
+Configure via `teamsIntegrationType` parameter. See `infra/bicep/README.md` for setup details.
+
+### Quick Deploy
+
+```bash
+# Create resource group
+az group create --name rg-adl-invoice-dev --location westus3
+
+# Deploy infrastructure
+az deployment group create \
+  --resource-group rg-adl-invoice-dev \
+  --template-file infra/bicep/main.bicep \
+  --parameters infra/bicep/parameters/dev.bicepparam
+```
+
+### GitHub Actions Workflow
+
+**Workflow**: `.github/workflows/deploy-infra.yml`
+
+Manual workflow with:
+- Environment selection (dev/staging/prod)
+- What-if analysis mode (preview changes)
+- OIDC authentication (no secrets needed)
+- Automatic resource group creation
+- Deployment outputs and summary
+
+Trigger from GitHub Actions → Deploy Infrastructure → Select environment
+
+### Resource Naming
+
+Resources follow pattern: `{type}-adl-invoice-{env}-westus3`
+
+Examples:
+- `app-adl-invoice-dev-westus3` - Web App
+- `di-adl-invoice-dev-westus3` - Document Intelligence
+- `sb-adl-invoice-dev-westus3` - Service Bus namespace
+
+### Cost Estimates
+
+**Development**: ~$13/month (Basic tier, Free DI)
+**Production**: ~$100-150/month + usage (Premium tier, Standard DI)
+
+See `infra/bicep/README.md` for detailed documentation, Teams integration setup, and troubleshooting.
 
 ## Responsible AI & Security
 - **Validated AI models**: Azure Document Intelligence prebuilt invoice model (Microsoft-validated)
