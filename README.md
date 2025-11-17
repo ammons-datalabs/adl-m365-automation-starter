@@ -598,42 +598,69 @@ This will automatically check:
 See `.pre-commit-setup.md` for details.
 
 ### Setup (OIDC - No secrets needed!)
-Configure federated credentials in Azure:
+
+**Why OIDC?** GitHub Actions can authenticate to Azure using OpenID Connect tokens instead of storing long-lived secrets. This is more secure and eliminates secret rotation.
+
+**Key concept:** Azure needs to trust GitHub's identity tokens. This trust is established via **federated credentials** that map your GitHub repository to an Azure service principal.
+
+#### Step 1: Create Service Principal with Federated Credential
+
 ```bash
-# Create app registration
-az ad app create --display-name "GitHub-ADL-M365"
+# 1. Create service principal with contributor access to your resource group
+az ad sp create-for-rbac \
+  --name "github-actions-adl-invoice" \
+  --role contributor \
+  --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP_NAME> \
+  --json-auth
 
-# Create service principal
-az ad sp create --id <APP_ID>
+# Save the clientId from the output - you'll need it in step 2 and for GitHub secrets
+```
 
-# Assign contributor role
-az role assignment create --role Contributor \
-  --subscription <SUBSCRIPTION_ID> \
-  --assignee-object-id <SP_OBJECT_ID> \
-  --assignee-principal-type ServicePrincipal \
-  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-adl-m365
+#### Step 2: Configure Federated Credential (REQUIRED for OIDC)
 
-# Add federated credential for main branch
+This step establishes trust between GitHub and Azure. The `subject` claim must match your repository path exactly:
+
+```bash
+# 2. Add federated credential for main branch
+# IMPORTANT: Replace YOUR_ORG and YOUR_REPO with your GitHub org/username and repo name
 az ad app federated-credential create \
-  --id <APP_ID> \
+  --id <CLIENT_ID_FROM_STEP_1> \
   --parameters '{
-    "name": "GitHubMain",
+    "name": "github-actions-main",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:YOUR_ORG/adl-m365-automation-starter:ref:refs/heads/main",
+    "subject": "repo:YOUR_ORG/YOUR_REPO:ref:refs/heads/main",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
 
-### GitHub Secrets
+**Subject claim format**: `repo:OWNER/REPO:ref:refs/heads/BRANCH`
+- Example: `repo:ammons-datalabs/adl-m365-automation-starter:ref:refs/heads/main`
+- For pull requests: `repo:OWNER/REPO:pull_request`
+- For environments: `repo:OWNER/REPO:environment:ENVIRONMENT_NAME`
+
+#### Step 3: Add GitHub Secrets
+
 Add these repository secrets (Settings → Secrets and variables → Actions):
-- `AZURE_CLIENT_ID`: Application (client) ID
-- `AZURE_TENANT_ID`: Directory (tenant) ID
-- `AZURE_SUBSCRIPTION_ID`: Subscription ID
+- `AZURE_CLIENT_ID`: Application (client) ID from Step 1
+- `AZURE_TENANT_ID`: Directory (tenant) ID from Step 1
+- `AZURE_SUBSCRIPTION_ID`: Your Azure subscription ID
+
+**No client secret needed!** OIDC authentication uses short-lived tokens instead.
+
+#### How It Works
+
+```
+GitHub Actions → Request OIDC token → GitHub OIDC provider
+                                            ↓ (signed token)
+Azure validates token → Check federated credential → Allow login
+         ↑ (subject matches repo)
+```
 
 **Benefits of OIDC**:
 - No rotating secrets or passwords
-- Short-lived tokens only
+- Short-lived tokens only (valid for job duration)
 - Azure AD manages authentication
+- Granular access control per repository/branch
 
 ## Infrastructure as Code (Bicep)
 
